@@ -1,7 +1,7 @@
 # libs and data
 import pandas as pd
 import matplotlib.pyplot as plt
-
+import arch
 
 sp_price = pd.read_csv("SP500.csv")
 
