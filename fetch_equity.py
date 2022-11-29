@@ -32,7 +32,7 @@ class crypto:
         a string that denotes the start date in the format (yyyy-mm-dd)
         end : str
         a string that denotes the start date in the format (yyyy-mm-dd)
-   """
+        """
         self.symbol = symbol
         self.granularity = granularity
         self.start = start
