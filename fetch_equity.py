@@ -27,7 +27,7 @@ class crypto:
         symbol : str
         a string that corresponds to the asset's symbol
         granularity : str
-        a sting that points to the time aggregation
+        a sting that points to the time aggregation. Supported intervals are ["1h", "1d", "1w"] for 1 hour, 1 day, and 1 week respectively.
         start : str
         a string that denotes the start date in the format (yyyy-mm-dd)
         end : str
@@ -70,7 +70,7 @@ class crypto:
 
 
 
-p1 = crypto(symbol='sol',granularity='1d', start= '2022-10-01', end='2022-11-29')
+p1 = crypto(symbol='sol',granularity='1w', start= '2022-10-01', end='2022-11-29')
 print(p1)
 p1.fetch_crypto()
 
