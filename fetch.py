@@ -80,4 +80,3 @@ plt.plot(arch_variance, color = 'red', label = 'ARCH Variance')
 plt.plot(garch_variance, color = 'orange', label = 'GARCH Variance')
 plt.legend()
 plt.show()
-
