@@ -135,15 +135,12 @@ class asset:
         DataFrame
             a DataFrame including performance metrics of selected symbol
         """
-
         import pandas as pd
         from pandas_datareader import data as stc
-
         raw = stc.get_data_yahoo(symbols=self.symbol,
                                  start=self.start,
                                  end=self.end,
                                  interval=self.granularity)
-
         raw.drop('Adj Close', axis=1, inplace=True)
         raw.reset_index(inplace=True)
         raw.columns = raw.columns.str.lower()
