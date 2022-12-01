@@ -1,6 +1,3 @@
-import pandas as pd
-
-
 class crypto:
     """
     A class used to represent an asset in decentralized networks - cryptocurrencies
@@ -152,7 +149,88 @@ class asset:
 
 '''
 sample use of class asset
-p2 = asset(symbol='VUSA.AS',granularity='d', start= '2022-01-01', end='2022-11-29')
+p2 = asset(symbol='CT=F',granularity='d', start= '2022-01-01', end='2022-11-29')
 print(p2)
 p2.fetch_asset()
 '''
+
+class commodity:
+        """
+        A class used to represent a raw material or primary agricultural product
+
+        ...
+        Attributes
+        ----------
+        base_currency : str
+            a string that corresponds to the commodity's base currency
+        symbol : str
+            a sting that corresponds to the commodity's symbol
+        start : str
+            a string that denotes the start date in the format (yyyy-mm-dd)
+        end : str
+            a string that denotes the start date in the format (yyyy-mm-dd)
+
+        Methods
+        -------
+        fetch_commodity()
+            Creates a DataFrame with commodity's daily price
+
+        """
+    def __init__(self, base_currency, symbol, start, end):
+        """
+        Parameters
+       ----------
+        base_currency : str
+            a string that corresponds to the commodity's base currency
+        symbol : str
+            a sting that corresponds to the commodity's symbol
+        start : str
+            a string that denotes the start date in the format (yyyy-mm-dd)
+        end : str
+            a string that denotes the start date in the format (yyyy-mm-dd)
+        """
+        self.base_currency = base_currency
+        self.symbol = symbol
+        self.start = start
+        self.end = end
+
+    def __str__(self):
+        return f"class of commodity object '{self.symbol}' "
+
+    def fetch_commodity(self):
+        """Gets the daily price of a commodity for a time window
+
+        Parameters
+        ----------
+        self : an object of class commodity
+            An object of class 'commodity' with relevant attributes
+
+        Returns
+        -------
+        DataFrame
+            a DataFrame including daily price of a commodity for a time window
+        """
+
+        import requests
+        import pandas as pd
+        access_key = '4rsap4p3c2o365t01lyf8eho0wjpwdgz7z1d8t1rt48txpowp8giivv0z278'
+        api_url = f'https://commodities-api.com/api/timeseries?access_key={access_key}&base={self.base_currency}&symbols={self.symbol}&start_date={self.start}&end_date={self.end}'
+        raw = requests.get(api_url).json()
+        df = pd.DataFrame(raw['data']['rates']).transpose()
+        df.drop(df.columns[0],axis=1,inplace= True)
+        df.rename(index={'Index': 'date'})
+        df.index = pd.to_datetime(df.index, unit='ns')
+        df.sort_index(inplace=True)
+        df['return'] = (100 * df.iloc[:,0].pct_change())
+        df.dropna(axis=0, inplace=True)
+        return(df)
+
+
+
+'''
+#sample use of class commodity
+p3 = commodity(base_currency='USD', symbol= 'CORN',start =  '2022-05-01',  end = '2022-11-30')
+print(p3)
+p3.fetch_commodity()
+'''
+
