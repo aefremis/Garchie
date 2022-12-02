@@ -155,28 +155,29 @@ p2.fetch_asset()
 '''
 
 class commodity:
-        """
-        A class used to represent a raw material or primary agricultural product
+    """
+    A class used to represent a raw material or primary agricultural product
+    ...
+    Attributes
+    ----------
+    base_currency : str
+        a string that corresponds to the commodity's base currency
+    symbol : str
+        a sting that corresponds to the commodity's symbol
+    start : str
+        a string that denotes the start date in the format (yyyy-mm-dd)
+    end : str
+        a string that denotes the start date in the format (yyyy-mm-dd)
+    granularity : str
+        a sting that points to the time aggregation. Supported intervals are ["d", "m", "w"] for daily, monthly, weekly respectively.
 
-        ...
-        Attributes
-        ----------
-        base_currency : str
-            a string that corresponds to the commodity's base currency
-        symbol : str
-            a sting that corresponds to the commodity's symbol
-        start : str
-            a string that denotes the start date in the format (yyyy-mm-dd)
-        end : str
-            a string that denotes the start date in the format (yyyy-mm-dd)
+    Methods
+    -------
+    fetch_commodity()
+        Creates a DataFrame with commodity's daily price
+    """
+    def __init__(self, base_currency, symbol ,granularity, start, end):
 
-        Methods
-        -------
-        fetch_commodity()
-            Creates a DataFrame with commodity's daily price
-
-        """
-    def __init__(self, base_currency, symbol, start, end):
         """
         Parameters
        ----------
@@ -188,17 +189,22 @@ class commodity:
             a string that denotes the start date in the format (yyyy-mm-dd)
         end : str
             a string that denotes the start date in the format (yyyy-mm-dd)
+        granularity : str
+            a sting that points to the time aggregation. Supported intervals are ["d", "m", "w"] for daily, monthly, weekly respectively.
         """
         self.base_currency = base_currency
         self.symbol = symbol
+        self.granularity = granularity
         self.start = start
         self.end = end
+
 
     def __str__(self):
         return f"class of commodity object '{self.symbol}' "
 
     def fetch_commodity(self):
-        """Gets the daily price of a commodity for a time window
+        """
+        Gets the daily price of a commodity for a time window
 
         Parameters
         ----------
@@ -211,26 +217,45 @@ class commodity:
             a DataFrame including daily price of a commodity for a time window
         """
 
+        import datetime as dt
         import requests
         import pandas as pd
+
         access_key = '4rsap4p3c2o365t01lyf8eho0wjpwdgz7z1d8t1rt48txpowp8giivv0z278'
         api_url = f'https://commodities-api.com/api/timeseries?access_key={access_key}&base={self.base_currency}&symbols={self.symbol}&start_date={self.start}&end_date={self.end}'
         raw = requests.get(api_url).json()
         df = pd.DataFrame(raw['data']['rates']).transpose()
         df.drop(df.columns[0],axis=1,inplace= True)
-        df.rename(index={'Index': 'date'})
         df.index = pd.to_datetime(df.index, unit='ns')
         df.sort_index(inplace=True)
-        df['return'] = (100 * df.iloc[:,0].pct_change())
-        df.dropna(axis=0, inplace=True)
+        if self.granularity == 'd':
+            df['return'] = (100 * df.iloc[:, 0].pct_change())
+            df.dropna(axis=0, inplace=True)
+        elif self.granularity == 'w':
+            df.reset_index(inplace=True)
+            df['week'] = df['index'].dt.isocalendar().week
+            df['year'] = df['index'].dt.isocalendar().year
+            df = df.groupby(['year', 'week']).agg({'index': 'last', df.columns[1]: 'last'})
+            df.reset_index(drop=True, inplace=True)
+            df.set_index('index', inplace=True)
+            df['return'] = (100 * df.iloc[:, 0].pct_change())
+            df.dropna(axis=0, inplace=True)
+        else:
+            df.reset_index(inplace=True)
+            df['month'] = df['index'].dt.month
+            df['year'] = df['index'].dt.isocalendar().year
+            df = df.groupby(['year', 'month']).agg({'index': 'last', df.columns[1]: 'last'})
+            df.reset_index(drop=True, inplace=True)
+            df.set_index('index', inplace=True)
+            df['return'] = (100 * df.iloc[:, 0].pct_change())
+            df.dropna(axis=0, inplace=True)
         return(df)
 
 
 
-'''
+
 #sample use of class commodity
-p3 = commodity(base_currency='USD', symbol= 'CORN',start =  '2022-05-01',  end = '2022-11-30')
+p3 = commodity(base_currency='USD', symbol= 'CORN',granularity = 'm',start =  '2022-05-01',  end = '2022-11-30')
 print(p3)
 p3.fetch_commodity()
 '''
-
