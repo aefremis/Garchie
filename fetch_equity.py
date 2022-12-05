@@ -201,7 +201,27 @@ class commodity:
 
     def __str__(self):
         return f"class of commodity object '{self.symbol}' "
+'''
+    def time_roll(gran, data_roll):
+        if gran == 'd':
+            data_roll['return'] = (100 * data_roll.iloc[:, 0].pct_change())
+            data_roll.dropna(axis=0, inplace=True)
+        else:
+            data_roll.reset_index(inplace=True)
+            if gran == 'w':
+                dyn_char, agg_level = '.dt.isocalendar().week', 'week'
+            elif gran == 'm':
+                dyn_char, agg_level = '.dt.month', 'month'
 
+            exec("data_roll['"+str(agg_level)+"'] = data_roll['index']" + dyn_char)
+            data_roll['year'] = data_roll['index'].dt.isocalendar().year
+            exec("data_roll = data_roll.groupby(['year', '"+str(agg_level)+"']).agg({'index': 'last', data_roll.columns[1]: 'last'})")
+            data_roll.reset_index(drop=True, inplace=True)
+            data_roll.set_index('index', inplace=True)
+            data_roll['return'] = (100 * data_roll.iloc[:, 0].pct_change())
+            data_roll.dropna(axis=0, inplace=True)
+        return(data_roll)
+'''
     def fetch_commodity(self):
         """
         Gets the daily price of a commodity for a time window
@@ -223,6 +243,7 @@ class commodity:
 
         access_key = '4rsap4p3c2o365t01lyf8eho0wjpwdgz7z1d8t1rt48txpowp8giivv0z278'
         api_url = f'https://commodities-api.com/api/timeseries?access_key={access_key}&base={self.base_currency}&symbols={self.symbol}&start_date={self.start}&end_date={self.end}'
+        #api_url = f'https://commodities-api.com/api/timeseries?access_key={access_key}&base=USD&symbols=CORN&start_date=2022-05-01&end_date=2022-11-30'
         raw = requests.get(api_url).json()
         df = pd.DataFrame(raw['data']['rates']).transpose()
         df.drop(df.columns[0],axis=1,inplace= True)
@@ -253,7 +274,7 @@ class commodity:
 
 
 
-
+'''
 #sample use of class commodity
 p3 = commodity(base_currency='USD', symbol= 'CORN',granularity = 'm',start =  '2022-05-01',  end = '2022-11-30')
 print(p3)
