@@ -30,10 +30,24 @@ plt.show()
 
 # build covariates
 
+cov_set = raw[['close']]
+cov_set.reset_index(inplace=True)
 
-# plot seasonality and trend plots
+new_cols = ['month','week','day','dayofweek','quarter']
+for i in new_cols:
+    cov_set[f'{i}'] = eval('cov_set["date"].dt.'+i)
+
+cov_set['wom'] = cov_set["date"].apply(lambda d: (d.day-1) // 7 + 1)
+cov_set.set_index('date',inplace=True)
+
 #auto detect seasonality based on covariates lm
 
+
+
+
+
+
+# plot seasonality and trend plots
 decompose_result_mult = seasonal_decompose(raw[['close']], period=62)
 
 fig, axs = plt.subplots(ncols=2, nrows=2)
