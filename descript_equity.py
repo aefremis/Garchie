@@ -5,13 +5,16 @@ import matplotlib.pyplot as plt
 plt.interactive(False)
 plt.style.use('ggplot')
 import pandas as pd
+import numpy as np
 from statsmodels.tsa.seasonal import seasonal_decompose
+from sklearn.linear_model import LinearRegression
+from scipy import stats
 
 # select asset
 asset_series = asset(symbol='VUSA.AS',
                      granularity='d',
                      start= '2020-06-01',
-                     end='2022-12-07')
+                     end='2022-12-15')
 print(asset_series)
 raw = asset_series.fetch_asset()
 raw.set_index('date',inplace=True)
@@ -42,13 +45,30 @@ cov_set.set_index('date',inplace=True)
 
 #auto detect seasonality based on covariates lm
 
+lin_mod = LinearRegression()
+covariates = cov_set.loc[:,cov_set.columns.str.contains('close')==False].copy()
+response = cov_set.loc[:,cov_set.columns.str.contains('close')==True].copy()
+lin_mod.fit(covariates,response)
+params =np.append(lin_mod.intercept_,lin_mod.coef_)
+predictions = lin_mod.predict(covariates)
+
+new_X = np.append(np.ones((len(covariates),1)),covariates,axis=1)
+MSE = (sum((response.to_numpy() - predictions)**2))/(len(new_X)-len(new_X[0]))
+v_b = MSE*(np.linalg.inv(np.dot(new_X.T,new_X)).diagonal())
+s_b = np.sqrt(v_b)
+t_b = params/ s_b
+p_val =[2*(1-stats.t.cdf(np.abs(i),(len(new_X)-len(new_X[0])))) for i in t_b]
+p_val = np.round(p_val,8)
+p_val
+lin_mod.coef_
+covariates.columns
+
+# R**2
+lin_mod.score(covariates,response)
 
 
-
-
-
-# plot seasonality and trend plots
-decompose_result_mult = seasonal_decompose(raw[['close']], period=62)
+# plot seasonality and trend plots  # double or triple based on pvals
+decompose_result_mult = seasonal_decompose(raw[['close']], period=30)
 
 fig, axs = plt.subplots(ncols=2, nrows=2)
 ax1, ax2, ax3, ax4 = axs.flat
