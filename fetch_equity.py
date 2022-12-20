@@ -202,7 +202,7 @@ class commodity:
     def __str__(self):
         return f"class of commodity object '{self.symbol}' "
 
-    def time_roll(gran, data_roll):
+    def time_roll(self, gran, data_roll):
         """
         Aggregates daily price of a commodity for a time level
 
@@ -261,7 +261,7 @@ class commodity:
         df.drop(df.columns[0],axis=1,inplace= True)
         df.index = pd.to_datetime(df.index, unit='ns')
         df.sort_index(inplace=True)
-        df = time_roll(self.granularity, df.copy())
+        df = self.time_roll(self.granularity, df.copy())
         return(df)
 
 
