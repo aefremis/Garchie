@@ -38,36 +38,40 @@ for i in new_cols:
 cov_set['wom'] = cov_set["date"].apply(lambda d: (d.day-1) // 7 + 1)
 cov_set.set_index('date',inplace=True)
 
-#auto detect seasonality based on covariates lm
-#model
+#auto detect seasonality
+#linear model
 lin_mod = LinearRegression(fit_intercept=True)
-# split sets
+#split sets
 covariates = cov_set.loc[:,cov_set.columns.str.contains('close')==False].copy()
 response = cov_set.loc[:,cov_set.columns.str.contains('close')==True].copy()
+#fit & predict model
 lin_mod.fit(covariates,response)
 params =np.append(lin_mod.intercept_,lin_mod.coef_)
 predictions = lin_mod.predict(covariates)
 
 # calculate p-values
-new_X = np.append(np.ones((len(covariates),1)),covariates,axis=1)
+new_X = np.append(np.ones((len(covariates),1)),
+                  covariates,
+                  axis=1)
 MSE = (sum((response.to_numpy() - predictions)**2))/(len(new_X)-len(new_X[0]))
-v_b = MSE*(np.linalg.inv(np.dot(new_X.T,new_X)).diagonal())
-s_b = np.sqrt(v_b)
-t_b = params/ s_b
-p_val =[2*(1-stats.t.cdf(np.abs(i),(len(new_X)-len(new_X[0])))) for i in t_b]
-p_val = np.round(p_val,8)
+critical_scores = params/ np.sqrt(MSE*(np.linalg.inv(np.dot(new_X.T,
+                                                            new_X)).diagonal()))
+
+# two sided p values
+p_val =[2*(1-stats.t.cdf(np.abs(i),(len(new_X)-len(new_X[0])))) for i in critical_scores]
+p_val = np.round(p_val,4)
 coefs = np.append(lin_mod.intercept_,lin_mod.coef_).flatten()
-covariates = covariates.columns.insert(0,"Intercept")
+covariates_names = covariates.columns.insert(0,"Intercept")
 
-
-# Dict object
-sig_dic = {'variables':covariates,
-           'Coef':coefs,
-           'P_vals':p_val}
+# significance dictionary
+sig_dic = {'variables':covariates_names,
+           'coef':coefs,
+           'p_vals':p_val}
 sig_df = pd.DataFrame.from_dict(sig_dic)
 
-# R**2
-lin_mod.score(covariates,response)
+# Coefficient of determination
+R_sq = round(lin_mod.score(covariates,
+                           response),2)
 
 # regression plot
 sns.regplot(x=response, y=predictions)
@@ -77,12 +81,31 @@ plt.title("Actual vs Predicted Values")
 plt.show()
 
 # actual vs predicted plot
+predictions_df = pd.Series(predictions.flatten())
+predictions_df.index = response.index
 
+plt.plot(response, color = 'navy', label = 'Actual')
+plt.plot(predictions_df, color = 'teal', label = 'Predicted',alpha=0.7)
+plt.legend(loc='upper right')
+plt.ylabel('Value')
+plt.xlabel('Date')
+plt.title("Actual vs Predicted Values")
+plt.xticks(rotation = 45)
+plt.show()
 
+# # create a figure with subplots
+# fig, axs = plt.subplots(nrows= 2, ncols= 2)
+#
+# # plot the first data set in the top left subplot
+# sns.regplot(ax = axs[0, 0],x=response, y=predictions)
+#
+# # plot the second data set in the top right subplot
+# axs[0, 1].plot(response, color = 'navy', label = 'Actual')
+# axs[0, 1].plot(predictions_df, color = 'teal', label = 'Predicted',alpha=0.7)
+#
+# plt.show()
 
-
-
-# plot seasonality and trend plots  # double or triple based on pvals
+# plot seasonality and trend plots  # double or triple based on pvals based on mstl - to be added
 decompose_result_mult = seasonal_decompose(raw[['close']], period=30)
 
 fig, axs = plt.subplots(ncols=2, nrows=2)
