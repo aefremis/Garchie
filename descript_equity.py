@@ -1,7 +1,8 @@
-from fetch_equity import asset
+from fetch_equity import crypto
 import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
+import seaborn as sns
 plt.interactive(False)
 plt.style.use('ggplot')
 import pandas as pd
@@ -11,18 +12,13 @@ from sklearn.linear_model import LinearRegression
 from scipy import stats
 
 # select asset
-asset_series = asset(symbol='VUSA.AS',
-                     granularity='d',
-                     start= '2020-06-01',
-                     end='2022-12-15')
+asset_series = crypto(symbol='btc',granularity='1d', start= '2022-01-01', end='2022-11-29')
 print(asset_series)
-raw = asset_series.fetch_asset()
-raw.set_index('date',inplace=True)
+raw = asset_series.fetch_crypto()
+#raw.set_index('date',inplace=True)
 
 # plot raw time series with smoothed line
 sma = raw[['close']].rolling(14).mean()
-
-
 plt.plot(raw['close'], color = 'navy', label = 'Daily Closes')
 plt.plot(sma, color = 'teal', label = 'Smoothed Line',alpha=0.8)
 plt.legend(loc='upper right')
@@ -32,7 +28,6 @@ plt.xticks(rotation = 45)
 plt.show()
 
 # build covariates
-
 cov_set = raw[['close']]
 cov_set.reset_index(inplace=True)
 
@@ -44,14 +39,16 @@ cov_set['wom'] = cov_set["date"].apply(lambda d: (d.day-1) // 7 + 1)
 cov_set.set_index('date',inplace=True)
 
 #auto detect seasonality based on covariates lm
-
-lin_mod = LinearRegression()
+#model
+lin_mod = LinearRegression(fit_intercept=True)
+# split sets
 covariates = cov_set.loc[:,cov_set.columns.str.contains('close')==False].copy()
 response = cov_set.loc[:,cov_set.columns.str.contains('close')==True].copy()
 lin_mod.fit(covariates,response)
 params =np.append(lin_mod.intercept_,lin_mod.coef_)
 predictions = lin_mod.predict(covariates)
 
+# calculate p-values
 new_X = np.append(np.ones((len(covariates),1)),covariates,axis=1)
 MSE = (sum((response.to_numpy() - predictions)**2))/(len(new_X)-len(new_X[0]))
 v_b = MSE*(np.linalg.inv(np.dot(new_X.T,new_X)).diagonal())
@@ -59,12 +56,30 @@ s_b = np.sqrt(v_b)
 t_b = params/ s_b
 p_val =[2*(1-stats.t.cdf(np.abs(i),(len(new_X)-len(new_X[0])))) for i in t_b]
 p_val = np.round(p_val,8)
-p_val
-lin_mod.coef_
-covariates.columns
+coefs = np.append(lin_mod.intercept_,lin_mod.coef_).flatten()
+covariates = covariates.columns.insert(0,"Intercept")
+
+
+# Dict object
+sig_dic = {'variables':covariates,
+           'Coef':coefs,
+           'P_vals':p_val}
+sig_df = pd.DataFrame.from_dict(sig_dic)
 
 # R**2
 lin_mod.score(covariates,response)
+
+# regression plot
+sns.regplot(x=response, y=predictions)
+plt.xlabel("Actual Values")
+plt.ylabel("Predicted Values")
+plt.title("Actual vs Predicted Values")
+plt.show()
+
+# actual vs predicted plot
+
+
+
 
 
 # plot seasonality and trend plots  # double or triple based on pvals

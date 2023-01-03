@@ -268,7 +268,7 @@ class commodity:
 
 '''
 #sample use of class commodity
-p3 = commodity(base_currency='USD', symbol= 'CORN',granularity = 'w',start =  '2022-05-01',  end = '2022-11-30')
+p3 = commodity(base_currency='USD', symbol= 'CORN',granularity = 'd',start =  '2022-06-01',  end = '2022-11-30')
 print(p3)
-p3.fetch_commodity()
+raw = p3.fetch_commodity()
 '''
