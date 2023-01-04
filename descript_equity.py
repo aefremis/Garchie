@@ -10,9 +10,10 @@ import numpy as np
 from statsmodels.tsa.seasonal import seasonal_decompose
 from sklearn.linear_model import LinearRegression
 from scipy import stats
+import plotly.graph_objects as go
 
 # select asset
-asset_series = crypto(symbol='btc',granularity='1d', start= '2022-01-01', end='2022-11-29')
+asset_series = crypto(symbol='sol',granularity='1d', start= '2022-09-01', end='2022-11-29')
 print(asset_series)
 raw = asset_series.fetch_crypto()
 #raw.set_index('date',inplace=True)
@@ -73,42 +74,25 @@ sig_df = pd.DataFrame.from_dict(sig_dic)
 R_sq = round(lin_mod.score(covariates,
                            response),2)
 
-# regression plot
-sns.regplot(x=response, y=predictions)
-plt.xlabel("Actual Values")
-plt.ylabel("Predicted Values")
-plt.title("Actual vs Predicted Values")
-plt.show()
-
 # actual vs predicted plot
 predictions_df = pd.Series(predictions.flatten())
 predictions_df.index = response.index
 
-plt.plot(response, color = 'navy', label = 'Actual')
-plt.plot(predictions_df, color = 'teal', label = 'Predicted',alpha=0.7)
-plt.legend(loc='upper right')
-plt.ylabel('Value')
-plt.xlabel('Date')
-plt.title("Actual vs Predicted Values")
+# create a figure with subplots
+fig, axes = plt.subplots(2, 1, figsize = (10,8))
+fig.suptitle('Actual vs Predicted')
+# plot the first data set in the top left subplot
+sns.regplot(ax = axes[0],x=response, y=predictions)
+# plot the second data set in the top right subplot
+axes[1].plot(response, color = 'navy', label = 'Actual')
+axes[1].plot(predictions_df, color = 'teal', label = 'Predicted',alpha=0.7)
 plt.xticks(rotation = 45)
 plt.show()
-
-# # create a figure with subplots
-# fig, axs = plt.subplots(nrows= 2, ncols= 2)
-#
-# # plot the first data set in the top left subplot
-# sns.regplot(ax = axs[0, 0],x=response, y=predictions)
-#
-# # plot the second data set in the top right subplot
-# axs[0, 1].plot(response, color = 'navy', label = 'Actual')
-# axs[0, 1].plot(predictions_df, color = 'teal', label = 'Predicted',alpha=0.7)
-#
-# plt.show()
 
 # plot seasonality and trend plots  # double or triple based on pvals based on mstl - to be added
 decompose_result_mult = seasonal_decompose(raw[['close']], period=30)
 
-fig, axs = plt.subplots(ncols=2, nrows=2)
+fig, axs = plt.subplots(ncols=2, nrows=2, figsize = (10,8))
 ax1, ax2, ax3, ax4 = axs.flat
 fig.suptitle('Seasonality & Trend')
 
@@ -136,11 +120,36 @@ plt.show()
 #decompose_result_mult.plot().show()
 # plot candle stick
 
+# plt.figure()
+# up = raw[raw.close >= raw.open]
+# down = raw[raw.close < raw.open]
+# #plot parameters
+# col1,col2,width,width2 = 'navy','teal',5,.5
+#
+# plt.bar(up.index, up.close-up.open, width, bottom= up.open, color = col2)
+# plt.bar(up.index, up.high-up.close, width2, bottom=up.close, color=col1)
+# plt.bar(up.index, up.low-up.open, width2, bottom=up.open, color=col1)
+#
+# plt.bar(down.index, down.close-down.open, width, bottom=down.open, color=col2)
+# plt.bar(down.index, down.high-down.open, width2, bottom=down.open, color=col2)
+# plt.bar(down.index, down.low-down.close, width2, bottom=down.close, color=col2)
+# plt.xticks(rotation=30, ha='right')
+# plt.show()
+fig = go.Figure(data=[go.Candlestick(x=raw.index,
+                open=raw.open,
+                high=raw.high,
+                low=raw.low,
+                close=raw.close)])
 
+fig.show()
 # plot acf pacf
+# from statsmodels.graphics.tsaplots import plot_acf
+# ac_dat = raw[['close']]
+# plot_acf(ac_dat, lags=30)
+# # Show the AR as a plot
+# plt.show()
 # outlier analysis
 
-# plot box plots per category
 
 
 
