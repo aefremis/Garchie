@@ -8,12 +8,12 @@ plt.style.use('ggplot')
 import pandas as pd
 import numpy as np
 from statsmodels.tsa.seasonal import seasonal_decompose
-from sklearn.linear_model import LinearRegression
-from scipy import stats
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 import plotly.graph_objects as go
+import statsmodels.api as sm
 
 # select asset
-asset_series = crypto(symbol='sol',granularity='1d', start= '2022-09-01', end='2022-11-29')
+asset_series = crypto(symbol='btc',granularity='1d', start= '2022-09-01', end='2022-11-29')
 print(asset_series)
 raw = asset_series.fetch_crypto()
 #raw.set_index('date',inplace=True)
@@ -41,41 +41,22 @@ cov_set.set_index('date',inplace=True)
 
 #auto detect seasonality
 #linear model
-lin_mod = LinearRegression(fit_intercept=True)
+lin_mod = LinearRegression()
 #split sets
 covariates = cov_set.loc[:,cov_set.columns.str.contains('close')==False].copy()
 response = cov_set.loc[:,cov_set.columns.str.contains('close')==True].copy()
-#fit & predict model
-lin_mod.fit(covariates,response)
-params =np.append(lin_mod.intercept_,lin_mod.coef_)
-predictions = lin_mod.predict(covariates)
 
-# calculate p-values
-new_X = np.append(np.ones((len(covariates),1)),
-                  covariates,
-                  axis=1)
-MSE = (sum((response.to_numpy() - predictions)**2))/(len(new_X)-len(new_X[0]))
-critical_scores = params/ np.sqrt(MSE*(np.linalg.inv(np.dot(new_X.T,
-                                                            new_X)).diagonal()))
+#build model
+covariates = sm.add_constant(covariates)
+model_structure = sm.OLS(response, covariates)
+linear_model = model_structure.fit()
+predictions = linear_model.predict(covariates)
 
-# two sided p values
-p_val =[2*(1-stats.t.cdf(np.abs(i),(len(new_X)-len(new_X[0])))) for i in critical_scores]
-p_val = np.round(p_val,4)
-coefs = np.append(lin_mod.intercept_,lin_mod.coef_).flatten()
-covariates_names = covariates.columns.insert(0,"Intercept")
-
-# significance dictionary
-sig_dic = {'variables':covariates_names,
-           'coef':coefs,
-           'p_vals':p_val}
-sig_df = pd.DataFrame.from_dict(sig_dic)
-
-# Coefficient of determination
-R_sq = round(lin_mod.score(covariates,
-                           response),2)
+#model summary
+linear_model.summary()
 
 # actual vs predicted plot
-predictions_df = pd.Series(predictions.flatten())
+predictions_df = pd.Series(predictions)
 predictions_df.index = response.index
 
 # create a figure with subplots
@@ -90,7 +71,7 @@ plt.xticks(rotation = 45)
 plt.show()
 
 # plot seasonality and trend plots  # double or triple based on pvals based on mstl - to be added
-decompose_result_mult = seasonal_decompose(raw[['close']], period=30)
+decompose_result_mult = seasonal_decompose(raw[['close']], period=7)
 
 fig, axs = plt.subplots(ncols=2, nrows=2, figsize = (10,8))
 ax1, ax2, ax3, ax4 = axs.flat
@@ -143,11 +124,21 @@ fig = go.Figure(data=[go.Candlestick(x=raw.index,
 
 fig.show()
 # plot acf pacf
-# from statsmodels.graphics.tsaplots import plot_acf
-# ac_dat = raw[['close']]
-# plot_acf(ac_dat, lags=30)
-# # Show the AR as a plot
-# plt.show()
+plot_acf(raw[['close']], lags=30)
+plot_pacf(raw[['close']], lags=30)
+
+plt.show()
+
+
+# create a figure with subplots
+fig, axes = plt.subplots(2, 1, figsize = (10,8))
+# plot the first data set in the top left subplot
+plot_acf(raw[['close']],ax = axes[0] ,lags=30)
+# plot the second data set in the top right subplot
+plot_pacf(raw[['close']],ax = axes[1] ,lags=30)
+plt.show()
+
+
 # outlier analysis
 
 
