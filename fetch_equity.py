@@ -254,7 +254,7 @@ class commodity:
         import requests
         import pandas as pd
 
-        access_key = '4rsap4p3c2o365t01lyf8eho0wjpwdgz7z1d8t1rt48txpowp8giivv0z278'
+        access_key = 'uccc9ozopkbqilvsm8vr061ss8g53at45e1yuy7580rck57fc0adllttk6m1'
         api_url = f'https://commodities-api.com/api/timeseries?access_key={access_key}&base={self.base_currency}&symbols={self.symbol}&start_date={self.start}&end_date={self.end}'
         raw = requests.get(api_url).json()
         df = pd.DataFrame(raw['data']['rates']).transpose()

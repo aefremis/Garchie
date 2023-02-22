@@ -1,4 +1,4 @@
-from fetch_equity import crypto
+from fetch_equity import commodity
 import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
@@ -11,12 +11,14 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
 import plotly.graph_objects as go
 import statsmodels.api as sm
+import hampel as hm
 
 # select asset
-asset_series = crypto(symbol='btc',granularity='1d', start= '2022-09-01', end='2022-11-29')
+asset_series = commodity(base_currency='USD', symbol= 'CORN',granularity = 'd',start =  '2022-06-01',  end = '2023-02-21')
 print(asset_series)
-raw = asset_series.fetch_crypto()
+raw = asset_series.fetch_commodity()
 #raw.set_index('date',inplace=True)
+raw = raw.rename(columns={'index' : 'date'})
 
 # plot raw time series with smoothed line
 sma = raw[['close']].rolling(14).mean()
@@ -31,7 +33,7 @@ plt.show()
 # build covariates
 cov_set = raw[['close']]
 cov_set.reset_index(inplace=True)
-
+#cov_set = cov_set.rename(columns={'index' : 'date'})
 new_cols = ['month','week','day','dayofweek','quarter']
 for i in new_cols:
     cov_set[f'{i}'] = eval('cov_set["date"].dt.'+i)
@@ -46,6 +48,7 @@ lin_mod = LinearRegression()
 covariates = cov_set.loc[:,cov_set.columns.str.contains('close')==False].copy()
 response = cov_set.loc[:,cov_set.columns.str.contains('close')==True].copy()
 
+
 #build model
 covariates = sm.add_constant(covariates)
 model_structure = sm.OLS(response, covariates)
@@ -54,7 +57,6 @@ predictions = linear_model.predict(covariates)
 
 #model summary
 linear_model.summary()
-
 # actual vs predicted plot
 predictions_df = pd.Series(predictions)
 predictions_df.index = response.index
@@ -71,7 +73,7 @@ plt.xticks(rotation = 45)
 plt.show()
 
 # plot seasonality and trend plots  # double or triple based on pvals based on mstl - to be added
-decompose_result_mult = seasonal_decompose(raw[['close']], period=7)
+decompose_result_mult = seasonal_decompose(raw[['close']], period=30)
 
 fig, axs = plt.subplots(ncols=2, nrows=2, figsize = (10,8))
 ax1, ax2, ax3, ax4 = axs.flat
@@ -124,8 +126,8 @@ fig = go.Figure(data=[go.Candlestick(x=raw.index,
 
 fig.show()
 # plot acf pacf
-plot_acf(raw[['close']], lags=30)
-plot_pacf(raw[['close']], lags=30)
+plot_acf(raw[['close']], lags=10)
+plot_pacf(raw[['close']], lags=10)
 
 plt.show()
 
@@ -133,18 +135,26 @@ plt.show()
 # create a figure with subplots
 fig, axes = plt.subplots(2, 1, figsize = (10,8))
 # plot the first data set in the top left subplot
-plot_acf(raw[['close']],ax = axes[0] ,lags=30)
+plot_acf(raw[['close']],ax = axes[0] ,lags=10)
 # plot the second data set in the top right subplot
-plot_pacf(raw[['close']],ax = axes[1] ,lags=30)
+plot_pacf(raw[['close']],ax = axes[1] ,lags=10)
 plt.show()
 
 
-# outlier analysis
+# outlier analysis -- hampel filter -- MAD
+outlier_indices = hm.hampel(raw['close'],
+                            window_size= 7,
+                            n=2,
+                            imputation=False)
 
 
-
-
-
+plt.plot(raw['close'], color = 'navy', label = 'Daily Closes')
+plt.scatter(raw.iloc[outlier_indices].index,raw.iloc[outlier_indices]['close'], color = 'orange', s = 50)
+plt.legend(loc='upper right')
+plt.xlabel('Symbol '+'Daily '+'Close')
+plt.ylabel('Value')
+plt.xticks(rotation = 45)
+plt.show()
 
 
 
