@@ -105,7 +105,7 @@ class asset:
         symbol : str
         a string that corresponds to the asset's symbol
         granularity : str
-        a sting that points to the time aggregation. Supported intervals are ["d", "m", "w"] for daily, monthly, weekly respectively.
+        a sting that points to the time aggregation. Supported intervals are ["1d", "1mo", "1wk"] for daily, monthly, weekly respectively.
         start : str
         a string that denotes the start date in the format (yyyy-mm-dd)
         end : str
@@ -133,11 +133,12 @@ class asset:
             a DataFrame including performance metrics of selected symbol
         """
         import pandas as pd
-        from pandas_datareader import data as stc
-        raw = stc.get_data_yahoo(symbols=self.symbol,
-                                 start=self.start,
-                                 end=self.end,
-                                 interval=self.granularity)
+        import yfinance as yf
+        raw = yf.download(self.symbol,
+                          start=self.start,
+                          end=self.end,
+                          interval=self.granularity)
+
         raw.drop('Adj Close', axis=1, inplace=True)
         raw.reset_index(inplace=True)
         raw.columns = raw.columns.str.lower()
@@ -149,7 +150,7 @@ class asset:
 
 '''
 sample use of class asset
-p2 = asset(symbol='CT=F',granularity='d', start= '2022-01-01', end='2022-11-29')
+p2 = asset(symbol='MSFT',granularity='1d', start= '2022-01-01', end='2022-11-29')
 print(p2)
 p2.fetch_asset()
 '''
