@@ -1,4 +1,4 @@
-from fetch_equity import commodity
+from fetch_equity import  commodity
 import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
@@ -14,11 +14,11 @@ import statsmodels.api as sm
 import hampel as hm
 
 # select asset
-asset_series = commodity(base_currency='USD', symbol= 'CORN',granularity = 'd',start =  '2022-06-01',  end = '2023-02-21')
+asset_series = commodity(base_currency='USD', symbol= 'WHEAT',granularity = 'd',start =  '2022-06-01',  end = '2022-11-30')
 print(asset_series)
 raw = asset_series.fetch_commodity()
 #raw.set_index('date',inplace=True)
-raw = raw.rename(columns={'index' : 'date'})
+raw = raw.rename(columns={'index' : 'date', 'WHEAT': 'close'})
 
 # plot raw time series with smoothed line
 sma = raw[['close']].rolling(14).mean()
@@ -33,7 +33,7 @@ plt.show()
 # build covariates
 cov_set = raw[['close']]
 cov_set.reset_index(inplace=True)
-#cov_set = cov_set.rename(columns={'index' : 'date'})
+cov_set = cov_set.rename(columns={'index' : 'date'})
 new_cols = ['month','week','day','dayofweek','quarter']
 for i in new_cols:
     cov_set[f'{i}'] = eval('cov_set["date"].dt.'+i)
@@ -42,8 +42,6 @@ cov_set['wom'] = cov_set["date"].apply(lambda d: (d.day-1) // 7 + 1)
 cov_set.set_index('date',inplace=True)
 
 #auto detect seasonality
-#linear model
-lin_mod = LinearRegression()
 #split sets
 covariates = cov_set.loc[:,cov_set.columns.str.contains('close')==False].copy()
 response = cov_set.loc[:,cov_set.columns.str.contains('close')==True].copy()
@@ -73,7 +71,7 @@ plt.xticks(rotation = 45)
 plt.show()
 
 # plot seasonality and trend plots  # double or triple based on pvals based on mstl - to be added
-decompose_result_mult = seasonal_decompose(raw[['close']], period=30)
+decompose_result_mult = seasonal_decompose(raw[['close']], period=7)
 
 fig, axs = plt.subplots(ncols=2, nrows=2, figsize = (10,8))
 ax1, ax2, ax3, ax4 = axs.flat
@@ -126,18 +124,12 @@ fig = go.Figure(data=[go.Candlestick(x=raw.index,
 
 fig.show()
 # plot acf pacf
-plot_acf(raw[['close']], lags=10)
-plot_pacf(raw[['close']], lags=10)
-
-plt.show()
-
-
 # create a figure with subplots
 fig, axes = plt.subplots(2, 1, figsize = (10,8))
 # plot the first data set in the top left subplot
-plot_acf(raw[['close']],ax = axes[0] ,lags=10)
+plot_acf(raw[['close']],ax = axes[0] ,lags=20)
 # plot the second data set in the top right subplot
-plot_pacf(raw[['close']],ax = axes[1] ,lags=10)
+plot_pacf(raw[['close']],ax = axes[1] ,lags=20)
 plt.show()
 
 
@@ -150,26 +142,22 @@ outlier_indices = hm.hampel(raw['close'],
 
 plt.plot(raw['close'], color = 'navy', label = 'Daily Closes')
 plt.scatter(raw.iloc[outlier_indices].index,raw.iloc[outlier_indices]['close'], color = 'orange', s = 50)
-plt.legend(loc='upper right')
 plt.xlabel('Symbol '+'Daily '+'Close')
 plt.ylabel('Value')
 plt.xticks(rotation = 45)
 plt.show()
 
 
+def calc_volatility(period, returns_ts):
+    # calculate volatility as the standard deviation of variance
+    mean_returns = round(returns_ts.abs().mean(),2)
+    std_returns = returns_ts.std()
+    # turn into period volatility
+    period_volatility = round(np.sqrt(period) * std_returns, 2)
+    print('Single steps absolute changes: ', '{:.2f}%'.format(mean_returns))
+    print('Period volatility: ', '{:.2f}%'.format(period_volatility))
+    return mean_returns, period_volatility
 
-# plot the data
+calc_volatility(10,raw['return'])
 
-# calculate volatility as the standard deviation of variance
-mean_daily = crypto['Return'].abs().mean()
-print('Mean Daily absolute changes: ', '{:.2f}%'.format(mean_daily))
-std_daily = crypto['Return'].std()
-print('Daily volatility: ', '{:.2f}%'.format(std_daily))
-
-# turn into monthly volatility
-# x =  21 trading days
-x = 21
-month_volatility = round(np.sqrt(x) * std_daily,
-                         2)
-print('Monthly volatility: ', '{:.2f}%'.format(month_volatility))
 
