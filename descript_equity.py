@@ -1,4 +1,4 @@
-from fetch_equity import  commodity
+from fetch_equity import  asset
 import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
@@ -14,11 +14,11 @@ import statsmodels.api as sm
 import hampel as hm
 
 # select asset
-asset_series = commodity(base_currency='USD', symbol= 'WHEAT',granularity = 'd',start =  '2022-06-01',  end = '2022-11-30')
+asset_series = asset(symbol='VUSA.AS',granularity='1d', start= '2022-01-01', end='2022-11-29')
 print(asset_series)
-raw = asset_series.fetch_commodity()
-#raw.set_index('date',inplace=True)
-raw = raw.rename(columns={'index' : 'date', 'WHEAT': 'close'})
+raw = asset_series.fetch_asset()
+raw.set_index('date',inplace=True)
+#raw = raw.rename(columns={'index' : 'date', 'WHEAT': 'close'})
 
 # plot raw time series with smoothed line
 sma = raw[['close']].rolling(14).mean()
@@ -71,7 +71,7 @@ plt.xticks(rotation = 45)
 plt.show()
 
 # plot seasonality and trend plots  # double or triple based on pvals based on mstl - to be added
-decompose_result_mult = seasonal_decompose(raw[['close']], period=7)
+decompose_result_mult = seasonal_decompose(raw[['close']], period=90)
 
 fig, axs = plt.subplots(ncols=2, nrows=2, figsize = (10,8))
 ax1, ax2, ax3, ax4 = axs.flat
@@ -158,6 +158,6 @@ def calc_volatility(period, returns_ts):
     print('Period volatility: ', '{:.2f}%'.format(period_volatility))
     return mean_returns, period_volatility
 
-calc_volatility(10,raw['return'])
+calc_volatility(7,raw['return'])
 
 

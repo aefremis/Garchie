@@ -150,7 +150,7 @@ class asset:
 
 '''
 sample use of class asset
-p2 = asset(symbol='MSFT',granularity='1d', start= '2022-01-01', end='2022-11-29')
+p2 = asset(symbol='VUSA.AS',granularity='1d', start= '2022-01-01', end='2022-11-29')
 print(p2)
 p2.fetch_asset()
 '''
