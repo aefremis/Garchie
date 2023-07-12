@@ -14,16 +14,23 @@ import statsmodels.api as sm
 import hampel as hm
 
 # select asset
-asset_series = asset(symbol='VUSA.AS',granularity='1d', start= '2022-01-01', end='2022-11-29')
+asset_series = asset(symbol='VUSA.AS',granularity='1d', start= '2021-01-01', end='2022-11-29')
 print(asset_series)
 raw = asset_series.fetch_asset()
 raw.set_index('date',inplace=True)
 #raw = raw.rename(columns={'index' : 'date', 'WHEAT': 'close'})
 
-# plot raw time series with smoothed line
+# plot raw time series with smoothed line and bollinger band
 sma = raw[['close']].rolling(14).mean()
+raw['typical_price'] = (raw['high'] + raw['low'] + raw['close']) / 3
+roll_std = raw[['typical_price']].rolling(14).std()
+upper_boll = sma['close'] + 2*roll_std['typical_price']
+lower_boll = sma['close'] - 2*roll_std['typical_price']
+
 plt.plot(raw['close'], color = 'navy', label = 'Daily Closes')
 plt.plot(sma, color = 'teal', label = 'Smoothed Line',alpha=0.8)
+plt.plot(upper_boll, color = 'red', label = 'Upper Bollinger')
+plt.plot(lower_boll, color = 'green', label = 'Upper Bollinger',alpha=0.8)
 plt.legend(loc='upper right')
 plt.xlabel('Symbol '+'Daily '+'Close')
 plt.ylabel('Value')
