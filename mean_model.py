@@ -70,8 +70,8 @@ class mean_model:
         import matplotlib
         matplotlib.use("TkAgg")
         import matplotlib.pyplot as plt
-
-        if self.stationarity == 1:
+        global model
+        if self.stationarity == True:
             # stationarity -Dickey Fuller (add also kpss and decide on optimal diffs)
             # p value < 0.05 -- stationary time series
             dftest = adfuller(ts)
@@ -86,8 +86,8 @@ class mean_model:
         # Train Test Split Index
         if self.hold_out != 0.8:
             train_size = self.hold_out
-        else :
-            train_seze = 0.8
+        else:
+            train_size = 0.8
 
         split_idx = round(len(ts)* train_size)
 
@@ -95,11 +95,13 @@ class mean_model:
         train, test = ts.iloc[:split_idx], ts.iloc[split_idx:]
 
         # Visualize split
-        fig, ax = plt.subplots(figsize=(12, 8))
-        plt.plot(train, label='Train', marker='.')
-        plt.plot(test, label='Test', marker='.')
-        ax.legend(bbox_to_anchor=[1, 1])
-        plt.show()
+        if self.diagnostics == True:
+            fig, ax = plt.subplots(figsize=(12, 8))
+            plt.plot(train, label='Train', marker='.')
+            plt.plot(test, label='Test', marker='.')
+            ax.legend(bbox_to_anchor=[1, 1])
+            plt.show()
+
 
         # d term
         kpss_diffs = pmdarima.arima.ndiffs(train, alpha=0.05, test='kpss', max_d=6)
@@ -112,49 +114,57 @@ class mean_model:
                                     start_p=0,
                                     start_q=0,
                                     seasonal=True)
-        model.summary()
-        model.plot_diagnostics()
-        plt.show()
+        if self.diagnostics == True:
+            model.plot_diagnostics()
+            plt.show()
 
-        fc, conf_int = model.predict(n_periods=len(test), return_conf_int=True)
-        pred_df = pd.DataFrame({'pred': fc,
-                                'lower': conf_int[:, 0],
-                                'upper': conf_int[:, 1]})
-        pred_df.set_index(test.index, inplace=True)
+        if self.diagnostics == True:
+            fc, conf_int = model.predict(n_periods=len(test), return_conf_int=True)
+            pred_df = pd.DataFrame({'pred': fc,
+                                    'lower': conf_int[:, 0],
+                                    'upper': conf_int[:, 1]})
+            pred_df.set_index(test.index, inplace=True)
+            fig, ax = plt.subplots(figsize=(12, 7))
+            ax.plot(train, label='Train', marker='.')
+            ax.plot(test, label='Test', marker='.')
+            ax.plot(pred_df['pred'], label='Prediction', ls='--', linewidth=3)
 
-        fig, ax = plt.subplots(figsize=(12, 7))
-        ax.plot(train, label='Train', marker='.')
-        ax.plot(test, label='Test', marker='.')
-        ax.plot(pred_df['pred'], label='Prediction', ls='--', linewidth=3)
+            ax.fill_between(x=pred_df.index, y1=pred_df['lower'], y2=pred_df['upper'], alpha=0.3)
+            ax.set_title('Model Validation', fontsize=22)
+            ax.legend(loc='upper left')
+            fig.tight_layout()
+            plt.show()
 
-        ax.fill_between(x=pred_df.index, y1=pred_df['lower'], y2=pred_df['upper'], alpha=0.3)
-        ax.set_title('Model Validation', fontsize=22)
-        ax.legend(loc='upper left')
-        fig.tight_layout()
-        plt.show()
+            # predict future
+            best_model = SARIMAX(ts,
+                                 order=model.order,
+                                 seasonal_order=model.seasonal_order).fit()
+            # best_model.summary()
+            best_model.plot_diagnostics()
+            plt.show()
+            # best_model.fittedvalues
 
-        # predict future
-        best_model = SARIMAX(ts,
-                             order=model.order,
-                             seasonal_order=model.seasonal_order).fit()
-        best_model.summary()
-        best_model.plot_diagnostics()
-        plt.show()
-        best_model.fittedvalues
+            forecast = best_model.get_forecast(steps=15)
+            pred_df = forecast.conf_int()
+            pred_df['pred'] = forecast.predicted_mean
+            pred_df.columns = ['lower', 'upper', 'pred']
 
-        forecast = best_model.get_forecast(steps=15)
-        pred_df = forecast.conf_int()
-        pred_df['pred'] = forecast.predicted_mean
-        pred_df.columns = ['lower', 'upper', 'pred']
+            fig, ax = plt.subplots(figsize=(12, 7))
+            ax.plot(train, label='Train', marker='.')
+            ax.plot(test, label='Test', marker='.')
+            ax.plot(pred_df['pred'], label='Prediction', ls='--', linewidth=3)
 
-        fig, ax = plt.subplots(figsize=(12, 7))
-        ax.plot(train, label='Train', marker='.')
-        ax.plot(test, label='Test', marker='.')
-        ax.plot(pred_df['pred'], label='Prediction', ls='--', linewidth=3)
+            ax.fill_between(x=pred_df.index, y1=pred_df['lower'], y2=pred_df['upper'], alpha=0.3)
+            ax.set_title('Model Predictions', fontsize=22)
+            ax.legend(loc='upper left')
+            fig.tight_layout()
+            plt.show()
 
-        ax.fill_between(x=pred_df.index, y1=pred_df['lower'], y2=pred_df['upper'], alpha=0.3)
-        ax.set_title('Model Predictions', fontsize=22)
-        ax.legend(loc='upper left')
-        fig.tight_layout()
-        plt.show()
+        return(model)
 
+'''
+# sample use
+mm = mean_model(ts = ts,hold_out= 0.8,stationarity= False,diagnostics=False)
+print(mm)
+mm.design_mean_model()
+'''
