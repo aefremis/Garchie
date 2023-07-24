@@ -2,37 +2,49 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import arch
+from fetch_equity import crypto, asset
 
-sp_price = pd.read_csv("SP500.csv")
+# select asset
+asset_series = asset(symbol='VUSA.AS',granularity='1d', start= '2019-01-01', end='2023-06-25')
+print(asset_series)
+raw = asset_series.fetch_asset()
 
-## Observe volatility clustering
+#raw.set_index('date',inplace=True)
+ts = raw['return'].copy()
 
-# Calculate daily returns as percentage price changes
-sp_price['Return'] = 100 * (sp_price['Close'].pct_change())
-
-# View the data
-print(sp_price.tail(10))
-
-# plot the data
-plt.plot(sp_price['Return'], color = 'tomato', label = 'Daily Returns')
-plt.legend(loc='upper right')
-plt.show()
-
-## Calculate volatility
-
-# Plot the price returns
-plt.plot(sp_data['Return'], color = 'orange')
-plt.show()
 
 # Calculate daily std of returns
-std_daily = sp_data['Return'].std()
-print('Daily volatility: ', '{:.2f}%'.format(std_daily))
+def calc_volatility(period, returns_ts):
+    # calculate volatility as the standard deviation of variance
+    mean_returns = round(returns_ts.abs().mean(),2)
+    std_returns = returns_ts.std()
+    # turn into period volatility
+    period_volatility = round(np.sqrt(period) * std_returns, 2)
+    print('Single steps absolute changes: ', '{:.2f}%'.format(mean_returns))
+    print('Period volatility: ', '{:.2f}%'.format(period_volatility))
+    return mean_returns, period_volatility
 
+calc_volatility(7,ts)
+'''
 ## Simulate ARCH and GARCH series
+def simulate_GARCH(n, omega, alpha, beta=0):
+    np.random.seed(4)
+    # Initialize the parameters
+    white_noise = np.random.normal(size=n)
+    resid = np.zeros_like(white_noise)
+    variance = np.zeros_like(white_noise)
 
+    for t in range(1, n):
+        # Simulate the variance (sigma squared)
+        variance[t] = omega + alpha * resid[t - 1] ** 2 + beta * variance[t - 1]
+        # Simulate the residuals
+        resid[t] = np.sqrt(variance[t]) * white_noise[t]
+
+    return resid, variance
 # Simulate a ARCH(1) series
 arch_resid, arch_variance = simulate_GARCH(n= 200, 
                                            omega = 0.1, alpha = 0.7)
+
 # Simulate a GARCH(1,1) series
 garch_resid, garch_variance = simulate_GARCH(n= 200, 
                                              omega = 0.1, alpha = 0.7, 
@@ -53,22 +65,14 @@ plt.plot(sim_variance, color = 'orange', label = 'Variance')
 plt.plot(sim_resid, color = 'green', label = 'Residuals')
 plt.legend(loc='upper right')
 plt.show()
-
+'''
 ## Implement a basic GARCH model
 
 # Specify GARCH model assumptions
-basic_gm = arch_model(sp_data['Return'], p = 1, q = 1,
+basic_gm = arch.arch_model(ts, p = 1, q = 1,
                       mean = 'constant', vol = 'GARCH', dist = 'normal')
 # Fit the model
 gm_result = basic_gm.fit(update_freq = 4)
-
-## Make forecast with GARCH models
-
-# Specify a GARCH(1,1) model
-basic_gm = arch_model(sp_data['Return'], p = 1, q = 1, 
-                      mean = 'constant', vol = 'GARCH', dist = 'normal')
-# Fit the model
-gm_result = basic_gm.fit()
 
 ## Plot distribution of standardized residuals
 
@@ -82,21 +86,25 @@ gm_std_resid = gm_resid /gm_std
 # Plot the histogram of the standardized residuals
 plt.hist(gm_std_resid, bins = 50, 
          facecolor = 'orange', label = 'Standardized residuals')
-plt.hist(normal_resid, bins = 50, 
-         facecolor = 'tomato', label = 'Normal residuals')
 plt.legend(loc = 'upper left')
 plt.show()
 
 ## Fit a GARCH with skewed t-distribution
 # Specify GARCH model assumptions
-skewt_gm = arch_model(sp_data['Return'], p = 1, q = 1, mean = 'constant', vol = 'GARCH', dist = 'skewt')
+skewt_gm = arch.arch_model(raw['return'], p = 1, q = 1, mean = 'constant', vol = 'GARCH', dist = 'skewt')
 # Fit the model
 skewt_result = skewt_gm.fit()
+cmean_vol = skewt_result.conditional_volatility
+# Specify GARCH model assumptions
+armean = arch.arch_model(raw['return'], p = 1, q = 1, mean = 'AR', vol = 'GARCH', dist = 'skewt')
+# Fit the model
+armean_result = armean.fit()
+armean_vol = armean_result.conditional_volatility
 
 ## Effect of mean model on volatility predictions
 
 # Print model summary of GARCH with constant mean
-print(cmean_result.summary())
+print(skewt_result.summary())
 # Print model summary of GARCH with AR mean
 print(armean_result.summary())
 
@@ -109,31 +117,45 @@ plt.show()
 # Check correlation of volatility estimations
 print(np.corrcoef(cmean_vol, armean_vol)[0,1])
 
-##Fit GARCH models to cryptocurrency
+##Fit GJR- GARCH models to ts
 
 # Specify model assumptions
-gjr_gm = arch_model(bitcoin_data['Return'], p = 1, q = 1, o = 1, vol = 'GARCH', dist = 't')
+gjr_gm = arch.arch_model(ts, p = 1, q = 1, o = 1, vol = 'GARCH', dist = 't')
 
 # Fit the model
 gjrgm_result = gjr_gm.fit(disp = 'off')
-
+gjrgm_vol = gjrgm_result.conditional_volatility
 # Print model fitting summary
 print(gjrgm_result.summary())
+
+##Fit E- GARCH models to ts
+
+# Specify model assumptions
+e_gm = arch.arch_model(ts, p = 1, q = 1, o = 1, vol = 'EGARCH', dist = 't')
+
+# Fit the model
+e_result = e_gm.fit(disp = 'off')
+e_vol = e_result.conditional_volatility
+# Print model fitting summary
+print(e_result.summary())
 
 ## Compare GJR-GARCH with EGARCH
 
 # Plot the actual Bitcoin returns
-plt.plot(bitcoin_data['Return'], color = 'grey', alpha = 0.4, label = 'Price Returns')
+plt.plot(ts, color = 'grey', alpha = 0.4, label = 'Price Returns')
 
 # Plot GJR-GARCH estimated volatility
 plt.plot(gjrgm_vol, color = 'gold', label = 'GJR-GARCH Volatility')
 
 # Plot EGARCH  estimated volatility
-plt.plot(egarch_vol, color = 'red', label = 'EGARCH Volatility')
+plt.plot(e_vol, color = 'red', label = 'EGARCH Volatility')
 
 plt.legend(loc = 'upper right')
 plt.show()
-
+# Print each models BIC
+print(f'GJR-GARCH BIC: {gjrgm_result.bic}')
+print(f'\nEGARCH BIC: {e_result.bic}')
+###########################################################################################
 ## Fixed rolling window forecast
 
 for i in range(30):
