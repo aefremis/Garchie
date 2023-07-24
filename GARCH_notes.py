@@ -156,6 +156,8 @@ plt.show()
 print(f'GJR-GARCH BIC: {gjrgm_result.bic}')
 print(f'\nEGARCH BIC: {e_result.bic}')
 ###########################################################################################
+
+
 ## Fixed rolling window forecast
 
 for i in range(30):
