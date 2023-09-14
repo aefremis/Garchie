@@ -72,7 +72,7 @@ class crypto:
 '''
 sample use of class crypto
 
-p1 = crypto(symbol='btc',granularity='1w', start= '2022-01-01', end='2022-11-29')
+p1 = crypto(symbol='btc',granularity='1d', start= '2023-01-01', end='2023-06-25')
 print(p1)
 p1.fetch_crypto()
 '''
@@ -150,7 +150,7 @@ class asset:
 
 '''
 sample use of class asset
-p2 = asset(symbol='VUSA.AS',granularity='1d', start= '2022-01-01', end='2022-11-29')
+p2 = asset(symbol='VUSA.AS',granularity='1d', start= '2023-01-01', end='2023-06-25')
 print(p2)
 p2.fetch_asset()
 '''
@@ -255,8 +255,9 @@ class commodity:
         import requests
         import pandas as pd
 
-        access_key = 'uccc9ozopkbqilvsm8vr061ss8g53at45e1yuy7580rck57fc0adllttk6m1'
+        access_key = 'adg0rmqpjs8s5do6o5dzyx78i53u7k7q7mlsg1km1439eo0agw74yisikr8m'
         api_url = f'https://commodities-api.com/api/timeseries?access_key={access_key}&base={self.base_currency}&symbols={self.symbol}&start_date={self.start}&end_date={self.end}'
+
         raw = requests.get(api_url).json()
         df = pd.DataFrame(raw['data']['rates']).transpose()
         df.drop(df.columns[0],axis=1,inplace= True)
@@ -269,7 +270,7 @@ class commodity:
 
 '''
 #sample use of class commodity
-p3 = commodity(base_currency='USD', symbol= 'WTI OIL',granularity = 'd',start =  '2022-06-01',  end = '2022-11-30')
+p3 = commodity(base_currency='USD', symbol= 'WTI OIL',granularity = 'd',start =  '2023-01-01',  end = '2023-06-25')
 print(p3)
 raw = p3.fetch_commodity()
 '''

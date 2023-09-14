@@ -29,8 +29,8 @@ lower_boll = sma['close'] - 2*roll_std['typical_price']
 
 plt.plot(raw['close'], color = 'navy', label = 'Daily Closes')
 plt.plot(sma, color = 'teal', label = 'Smoothed Line',alpha=0.8)
-plt.plot(upper_boll, color = 'red', label = 'Upper Bollinger')
-plt.plot(lower_boll, color = 'green', label = 'Upper Bollinger',alpha=0.8)
+plt.plot(upper_boll, color = 'red', label = 'Upper Bollinger',alpha=0.5)
+plt.plot(lower_boll, color = 'green', label = 'Upper Bollinger',alpha=0.5)
 plt.legend(loc='upper right')
 plt.xlabel('Symbol '+'Daily '+'Close')
 plt.ylabel('Value')
@@ -155,16 +155,5 @@ plt.xticks(rotation = 45)
 plt.show()
 
 
-def calc_volatility(period, returns_ts):
-    # calculate volatility as the standard deviation of variance
-    mean_returns = round(returns_ts.abs().mean(),2)
-    std_returns = returns_ts.std()
-    # turn into period volatility
-    period_volatility = round(np.sqrt(period) * std_returns, 2)
-    print('Single steps absolute changes: ', '{:.2f}%'.format(mean_returns))
-    print('Period volatility: ', '{:.2f}%'.format(period_volatility))
-    return mean_returns, period_volatility
-
-calc_volatility(7,raw['return'])
 
 
