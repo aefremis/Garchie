@@ -1,5 +1,8 @@
 # libs and data
 import pandas as pd
+import numpy as np
+import matplotlib
+matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import arch
 from fetch_equity import crypto, asset
@@ -14,6 +17,19 @@ ts = raw['return'].copy()
 
 
 # Calculate daily std of returns
+'''
+Astatheia
+Volatility is typically unobservable,
+and as such estimated --- for example via the (sample) variance of returns, or more frequently,
+its square root yielding the standard deviation of returns as a volatility estimate.
+There are also countless models for volatility,
+    from old applied models like Garman/Klass to exponential
+    decaying and formal models such as GARCH or Stochastic Volatility.
+As for forecasts of the movement: well, that is a different topic as movement is 
+the first moment (mean, location) whereas volatility is a second moment (dispersion, variance, volatility). 
+So in a certain sense, volatility estimates do not give you estimates of future direction but of future ranges of movement.
+'''
+
 def calc_volatility(period, returns_ts):
     # calculate volatility as the standard deviation of variance
     mean_returns = round(returns_ts.abs().mean(),2)
@@ -24,48 +40,8 @@ def calc_volatility(period, returns_ts):
     print('Period volatility: ', '{:.2f}%'.format(period_volatility))
     return mean_returns, period_volatility
 
-calc_volatility(7,ts)
-'''
-## Simulate ARCH and GARCH series
-def simulate_GARCH(n, omega, alpha, beta=0):
-    np.random.seed(4)
-    # Initialize the parameters
-    white_noise = np.random.normal(size=n)
-    resid = np.zeros_like(white_noise)
-    variance = np.zeros_like(white_noise)
+calc_volatility(14,ts)
 
-    for t in range(1, n):
-        # Simulate the variance (sigma squared)
-        variance[t] = omega + alpha * resid[t - 1] ** 2 + beta * variance[t - 1]
-        # Simulate the residuals
-        resid[t] = np.sqrt(variance[t]) * white_noise[t]
-
-    return resid, variance
-# Simulate a ARCH(1) series
-arch_resid, arch_variance = simulate_GARCH(n= 200, 
-                                           omega = 0.1, alpha = 0.7)
-
-# Simulate a GARCH(1,1) series
-garch_resid, garch_variance = simulate_GARCH(n= 200, 
-                                             omega = 0.1, alpha = 0.7, 
-                                             beta = 0.1)
-# Plot the ARCH variance
-plt.plot(arch_variance, color = 'red', label = 'ARCH Variance')
-# Plot the GARCH variance
-plt.plot(garch_variance, color = 'orange', label = 'GARCH Variance')
-plt.legend()
-plt.show()
-
-## Observe the impact of model parameters
-
-# First simulated GARCH
-sim_resid, sim_variance = simulate_GARCH(n = 200,  omega = 0.1, 
-                                          alpha = 0.3, beta = 0.2)
-plt.plot(sim_variance, color = 'orange', label = 'Variance')
-plt.plot(sim_resid, color = 'green', label = 'Residuals')
-plt.legend(loc='upper right')
-plt.show()
-'''
 ## Implement a basic GARCH model
 
 # Specify GARCH model assumptions
@@ -155,16 +131,41 @@ plt.show()
 # Print each models BIC
 print(f'GJR-GARCH BIC: {gjrgm_result.bic}')
 print(f'\nEGARCH BIC: {e_result.bic}')
-###########################################################################################
 
 
 ## Fixed rolling window forecast
+ts.index = raw.date
+index = ts.index
+start_loc = 0
+end_loc = np.where(index >= '2022-11-24')[0].min()
+forecasts = {}
+from arch.__future__ import reindexing
+for i in range(len(ts) - end_loc):
+    sys.stdout.write('o')
+    sys.stdout.flush()
+    res = gjr_gm.fit(first_obs=start_loc + i, last_obs=i + end_loc, disp='off')
+    temp = res.forecast(horizon=1,start=end_loc).variance
+    fcast = temp.iloc[i]
+    forecasts[fcast.name] = fcast
+print(' Done!')
+variance_fixedwin = pd.DataFrame(forecasts).T
 
-for i in range(30):
-    # Specify fixed rolling window size for model fitting
-    gm_result = basic_gm.fit(first_obs = i + start_loc, 
-                             last_obs = i + end_loc, update_freq = 5)
 
+## Expanding window forecast
+ts.index = raw.date
+index = ts.index
+start_loc = 0
+end_loc = np.where(index >= '2022-11-24')[0].min()
+forecasts = {}
+for i in range(len(ts) - end_loc):
+    sys.stdout.write('-')
+    sys.stdout.flush()
+    res = gjr_gm.fit(first_obs = start_loc, last_obs = i + end_loc, disp = 'off')
+    temp = res.forecast(horizon=1,start=end_loc).variance
+    fcast = temp.iloc[i]
+    forecasts[fcast.name] = fcast
+print(' Done!')
+variance_expandwin = pd.DataFrame(forecasts).T
 ## Compare forecast results
 
 # Print top 5 rows of variance forecast with an expanding window
@@ -175,11 +176,11 @@ print(variance_fixedwin.head(5))
 ##Simplify the model with p-values
 
 # Print model fitting summary
-print(gm_result.summary())
+print(gjrgm_result.summary())
 
 # Get parameter stats from model summary
-para_summary = pd.DataFrame({'parameter':gm_result.params,
-                             'p-value': gm_result.pvalues})
+para_summary = pd.DataFrame({'parameter':gjrgm_result.params,
+                             'p-value': gjrgm_result.pvalues})
 
 # Print out parameter stats
 print(para_summary)
@@ -187,16 +188,9 @@ print(para_summary)
 ## Simplify the model with t-statistics
 
 # Get parameter stats from model summary
-para_summary = pd.DataFrame({'parameter':gm_result.params,
-                             'std-err': gm_result.std_err, 
-                             't-value': gm_result.tvalues})
-
-# Verify t-value by manual calculation
-calculated_t = para_summary['parameter']/para_summary['std-err']
-
-# Print calculated t-statistic
-print(calculated_t)
-
+para_summary = pd.DataFrame({'parameter':gjrgm_result.params,
+                             'std-err': gjrgm_result.std_err,
+                             't-value': gjrgm_result.tvalues})
 # Print parameter stats
 print(para_summary)
 
@@ -205,12 +199,12 @@ print(para_summary)
 from statsmodels.graphics.tsaplots import plot_acf
 
 # Plot the standardized residuals
-plt.plot(std_resid)
+plt.plot(gjrgm_result.resid.dropna())
 plt.title('Standardized Residuals')
 plt.show()
 
 # Generate ACF plot of the standardized residuals
-plot_acf(std_resid, alpha = 0.05)
+plot_acf(gjrgm_result.resid.dropna(), alpha = 0.05)
 plt.show()
 
 ## Ljung-Box test
@@ -219,38 +213,44 @@ plt.show()
 from statsmodels.stats.diagnostic import acorr_ljungbox
 
 # Perform the Ljung-Box test
-lb_test = acorr_ljungbox(std_resid , lags = 10)
+lb_test = acorr_ljungbox(gjrgm_result.std_resid , lags = 10)
 
-# Print the p-values
-print('P-values are: ', lb_test[1])
+# Store p-values in DataFrame
+df = pd.DataFrame({'P-values': lb_test['lb_pvalue']}).T
 
-## Pick a winner based on log-likelihood
-## In general, the bigger the log-likelihood, the better the model since it implies a bigger probability of having observed the data you got.
+# Create column names for each lag
+col_num = df.shape[1]
+col_names = ['lag_'+str(num) for num in list(range(1,col_num+1,1))]
 
-# Print normal GARCH model summary
-print(normal_result.summary())
-# Print skewed GARCH model summary
-print(skewt_result.summary())
+# Display the p-values
+df.columns = col_names
+df
+
+# Display the significant lags
+mask = df < 0.05
+df[mask].dropna(axis=1)
 
 # Print the log-likelihodd of normal GARCH
-print('Log-likelihood of normal GARCH :', normal_result.loglikelihood)
+## In general, the bigger the log-likelihood, the better the model since it implies a bigger probability of having observed the data you got.
+print('Log-likelihood of normal GJR-GARCH :', gjrgm_result.loglikelihood)
 # Print the log-likelihodd of skewt GARCH
-print('Log-likelihood of skewt GARCH :', skewt_result.loglikelihood)
+print('Log-likelihood of skewt GARCH :', e_result.loglikelihood)
+
 
 ## Pick a winner based on AIC/BIC
 ## The lower the AIC or BIC, the better the model.
 # Print the AIC GJR-GARCH
 print('AIC of GJR-GARCH model :', gjrgm_result.aic)
 # Print the AIC of EGARCH
-print('AIC of EGARCH model :', egarch_result.aic)
+print('AIC of EGARCH model :', e_result.aic)
 
 # Print the BIC GJR-GARCH
 print('BIC of GJR-GARCH model :', gjrgm_result.bic)
 # Print the BIC of EGARCH
-print('BIC of EGARCH model :', egarch_result.bic)
+print('BIC of EGARCH model :', e_result.bic)
 
 ## Backtesting with MAE, MSE
-
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 def evaluate(observation, forecast): 
     # Call sklearn function to calculate MAE
     mae = mean_absolute_error(observation, forecast)
@@ -261,83 +261,17 @@ def evaluate(observation, forecast):
     return mae, mse
 
 # Backtest model with MAE, MSE
-evaluate(actual_var, forecast_var)
+evaluate(raw['return'].sub(raw['return'].mean()).pow(2), gjrgm_vol**2)
+evaluate(raw['return'].sub(raw['return'].mean()).pow(2), e_vol**2)
 
-## Compute parametric VaR
+# Plot the actual  volatility
+plt.plot(raw['return'].sub(raw['return'].mean()).pow(2),
+         color = 'grey', alpha = 0.4, label = 'Daily Volatility')
 
-# Obtain the parametric quantile
-q_parametric = basic_gm.distribution.ppf(0.05, nu)
-print('5% parametric quantile: ', q_parametric)
-    
-# Calculate the VaR
-VaR_parametric = mean_forecast.values + np.sqrt(variance_forecast).values * q_parametric
-# Save VaR in a DataFrame
-VaR_parametric = pd.DataFrame(VaR_parametric, columns = ['5%'], index = variance_forecast.index)
+# Plot EGARCH  estimated volatility
+plt.plot(gjrgm_vol**2, color = 'red', label = 'GJR-GARCH Volatility')
 
-# Plot the VaR
-plt.plot(VaR_parametric, color = 'red', label = '5% Parametric VaR')
-plt.scatter(variance_forecast.index,bitcoin_data.Return['2019-1-1':], color = 'orange', label = 'Bitcoin Daily Returns' )
 plt.legend(loc = 'upper right')
 plt.show()
 
-## Compute empirical VaR
-# Obtain the empirical quantile
-q_empirical = std_resid.quantile(0.05)
-print('5% empirical quantile: ', q_empirical)
-
-# Calculate the VaR
-VaR_empirical = mean_forecast.values + np.sqrt(variance_forecast).values * q_empirical
-# Save VaR in a DataFrame
-VaR_empirical = pd.DataFrame(VaR_empirical, columns = ['5%'], index = variance_forecast.index)
-
-# Plot the VaRs
-plt.plot(VaR_empirical, color = 'brown', label = '5% Empirical VaR')
-plt.plot(VaR_parametric, color = 'red', label = '5% Parametric VaR')
-plt.scatter(variance_forecast.index,bitcoin_data.Return['2019-1-1':], color = 'orange', label = 'Bitcoin Daily Returns' )
-plt.legend(loc = 'upper right')
-plt.show()
-
-## Compute GARCH covariance
-
-# Calculate correlation
-corr = np.corrcoef(resid_eur, resid_cad)[0,1]
-print('Correlation: ', corr)
-
-# Calculate GARCH covariance
-covariance =  corr * vol_cad * vol_eur
-
-# Plot the data
-plt.plot(covariance, color = 'gold')
-plt.title('GARCH Covariance')
-plt.show()
-
-## Compute dynamic portfolio variance
-
-# Define weights
-Wa1 = 0.9
-Wa2 = 1 - Wa1
-Wb1 = 0.5
-Wb2 = 1 - Wb1
-
-# Calculate portfolio variance
-portvar_a = Wa1**2 * variance_eur + Wa2**2 * variance_cad + 2*Wa1*Wa2 *covariance
-portvar_b = Wb1**2 * variance_eur + Wb2**2 * variance_cad + 2*Wb1*Wb2*covariance
-
-# Plot the data
-plt.plot(portvar_a, color = 'green', label = 'Portfolio a')
-plt.plot(portvar_b, color = 'deepskyblue', label = 'Portfolio b')
-plt.legend(loc = 'upper right')
-plt.show()
-
-## Compute dynamic stock Beta
-
-# Compute correlation between SP500 and Tesla
-correlation = np.corrcoef(teslaGarch_resid, spGarch_resid)[0, 1]
-
-# Compute the Beta for Tesla
-stock_beta = correlation * (teslaGarch_vol / spGarch_vol)
-
-# Plot the Beta
-plt.title('Tesla Stock Beta')
-plt.plot(stock_beta)
-plt.show()
+### connect predictions with returns
