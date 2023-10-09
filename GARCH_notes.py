@@ -6,9 +6,10 @@ matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import arch
 from fetch_equity import crypto, asset
+from itertools import product
 
 # select asset
-asset_series = asset(symbol='VUSA.AS',granularity='1d', start= '2019-01-01', end='2023-06-25')
+asset_series = asset(symbol='VUSA.AS',granularity='1d', start= '2023-01-01', end='2023-06-25')
 print(asset_series)
 raw = asset_series.fetch_asset()
 
@@ -40,7 +41,7 @@ def calc_volatility(period, returns_ts):
     print('Period volatility: ', '{:.2f}%'.format(period_volatility))
     return mean_returns, period_volatility
 
-calc_volatility(14,ts)
+calc_volatility(7,ts)
 
 ## Implement a basic GARCH model
 
@@ -137,7 +138,7 @@ print(f'\nEGARCH BIC: {e_result.bic}')
 ts.index = raw.date
 index = ts.index
 start_loc = 0
-end_loc = np.where(index >= '2022-11-24')[0].min()
+end_loc = np.where(index >= '2023-05-30')[0].min()
 forecasts = {}
 from arch.__future__ import reindexing
 for i in range(len(ts) - end_loc):
@@ -155,7 +156,7 @@ variance_fixedwin = pd.DataFrame(forecasts).T
 ts.index = raw.date
 index = ts.index
 start_loc = 0
-end_loc = np.where(index >= '2022-11-24')[0].min()
+end_loc = np.where(index >= '2023-05-30')[0].min()
 forecasts = {}
 for i in range(len(ts) - end_loc):
     sys.stdout.write('-')
@@ -169,9 +170,9 @@ variance_expandwin = pd.DataFrame(forecasts).T
 ## Compare forecast results
 
 # Print top 5 rows of variance forecast with an expanding window
-print(variance_expandwin.head(5))
+print(variance_expandwin.head(15))
 # Print top 5 rows of variance forecast with a fixed rolling window
-print(variance_fixedwin.head(5))
+print(variance_fixedwin.head(15))
 
 ##Simplify the model with p-values
 
@@ -234,7 +235,7 @@ df[mask].dropna(axis=1)
 ## In general, the bigger the log-likelihood, the better the model since it implies a bigger probability of having observed the data you got.
 print('Log-likelihood of normal GJR-GARCH :', gjrgm_result.loglikelihood)
 # Print the log-likelihodd of skewt GARCH
-print('Log-likelihood of skewt GARCH :', e_result.loglikelihood)
+print('Log-likelihood of E-GARCH :', e_result.loglikelihood)
 
 
 ## Pick a winner based on AIC/BIC
@@ -270,8 +271,56 @@ plt.plot(raw['return'].sub(raw['return'].mean()).pow(2),
 
 # Plot EGARCH  estimated volatility
 plt.plot(gjrgm_vol**2, color = 'red', label = 'GJR-GARCH Volatility')
-
+plt.plot(e_vol**2, color = 'yellow', label = 'E-GARCH Volatility')
 plt.legend(loc = 'upper right')
 plt.show()
 
-### connect predictions with returns
+### add selection process and get variance of returns forecasts
+# Define a function for model fitting and evaluation
+def fit_evaluate_garch(p_order, q_order ):
+    model = arch.arch_model(y = ts, vol= 'GARCH' ,p = p_order, q = q_order )
+    #mean = mean,
+    #vol = 'GARCH',
+    #dist = dist
+    results = model.fit(disp='off')
+    return results.aic
+
+# Define the parameter grid
+p_values = range(3)
+q_values = range(3)
+mean_type_values = ['constant','zero','AR']
+distribution_values = ['normal','skewt']
+parameter_grid = list(product(p_values,
+                              q_values))
+#mean_type_values,
+#distribution_values
+parameter_grid = pd.DataFrame(parameter_grid,columns= ['p_order','q_order'])
+#,'mean_type','dist'
+# Initialize variables to store the best results
+best_aic = np.inf
+best_params = None
+
+# Perform grid search
+for i in range(parameter_grid.shape[0]):
+    try:
+        p_order, q_order = parameter_grid.iloc[i, :]
+        #, mean, dist
+        aic = fit_evaluate_garch(p_order, q_order)
+        print(aic)
+        #mean, dist,
+        if aic < best_aic:
+            best_aic = aic
+            best_params = (p_order, q_order)
+    except:
+        continue
+
+print("Best AIC:", best_aic)
+print("Best (p, q) values:", best_params)
+
+# Fit the best model to the full data
+best_p, best_q = best_params
+best_model = arch.arch_model(ts, vol='Garch', p=best_p, q=best_q)
+best_results = best_model.fit()
+
+# Visualize results
+best_results.plot()

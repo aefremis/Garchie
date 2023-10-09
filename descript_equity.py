@@ -14,10 +14,10 @@ import statsmodels.api as sm
 import hampel as hm
 
 # select asset
-asset_series = asset(symbol='VUSA.AS',granularity='1d', start= '2021-01-01', end='2022-11-29')
+asset_series = crypto(symbol='xrp',granularity='1d', start= '2023-01-01', end='2023-06-25')
 print(asset_series)
-raw = asset_series.fetch_asset()
-raw.set_index('date',inplace=True)
+raw = asset_series.fetch_crypto()
+#raw.set_index('date',inplace=True)
 #raw = raw.rename(columns={'index' : 'date', 'WHEAT': 'close'})
 
 # plot raw time series with smoothed line and bollinger band
@@ -37,6 +37,17 @@ plt.ylabel('Value')
 plt.xticks(rotation = 45)
 plt.show()
 
+
+'''
+# calculate RSI validate
+raw['Up'] = np.where(raw['return']>0,raw['return'],0)
+raw['Down'] = np.where(raw['return']<0,raw['return'],0)
+raw['Umean'] = raw[['Up']].rolling(14).mean()
+raw['Dmean'] = raw[['Down']].rolling(14).mean()
+raw['RS'] = raw.apply(lambda x : x['Umean']/x['Dmean'], axis=1)
+raw['RSI'] = raw.apply(lambda x : 100 - (100/1 + x['RS']), axis=1)
+'''
+
 # build covariates
 cov_set = raw[['close']]
 cov_set.reset_index(inplace=True)
@@ -53,7 +64,6 @@ cov_set.set_index('date',inplace=True)
 covariates = cov_set.loc[:,cov_set.columns.str.contains('close')==False].copy()
 response = cov_set.loc[:,cov_set.columns.str.contains('close')==True].copy()
 
-
 #build model
 covariates = sm.add_constant(covariates)
 model_structure = sm.OLS(response, covariates)
@@ -65,6 +75,7 @@ linear_model.summary()
 # actual vs predicted plot
 predictions_df = pd.Series(predictions)
 predictions_df.index = response.index
+
 
 # create a figure with subplots
 fig, axes = plt.subplots(2, 1, figsize = (10,8))
