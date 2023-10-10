@@ -150,6 +150,17 @@ plot_acf(raw[['close']],ax = axes[0] ,lags=20)
 plot_pacf(raw[['close']],ax = axes[1] ,lags=20)
 plt.show()
 
+def calc_volatility(period, returns_ts):
+    # calculate volatility as the standard deviation of variance
+    mean_returns = round(returns_ts.abs().mean(),2)
+    std_returns = returns_ts.std()
+    # turn into period volatility
+    period_volatility = round(np.sqrt(period) * std_returns, 2)
+    print('Single steps absolute changes: ', '{:.2f}%'.format(mean_returns))
+    print('Period volatility: ', '{:.2f}%'.format(period_volatility))
+    return mean_returns, period_volatility
+
+calc_volatility(14,raw['close'])
 
 # outlier analysis -- hampel filter -- MAD
 outlier_indices = hm.hampel(raw['close'],
