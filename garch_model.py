@@ -8,6 +8,7 @@ import arch
 from fetch_equity import crypto, asset
 from itertools import product
 
+
 # select asset
 asset_series = asset(symbol='aapl',granularity='1d', start= '2023-01-01', end='2023-10-01')
 print(asset_series)
