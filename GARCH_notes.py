@@ -9,9 +9,9 @@ from fetch_equity import crypto, asset
 from itertools import product
 
 # select asset
-asset_series = crypto(symbol='btc',granularity='1d', start= '2023-01-01', end='2023-09-25')
+asset_series = asset(symbol='aapl',granularity='1d', start= '2023-01-01', end='2023-10-01')
 print(asset_series)
-raw = asset_series.fetch_crypto()
+raw = asset_series.fetch_asset()
 
 #raw.set_index('date',inplace=True)
 ts = raw['return'].copy()
@@ -35,7 +35,7 @@ def fit_evaluate_garch(p_order, q_order, o_order,mean_type, vol_type ,dist_type 
     model = arch.arch_model(y = ts, vol= vol_type ,p = p_order, q = q_order,
                             o = o_order, mean = mean_type , dist = dist_type)
     results = model.fit(disp='off')
-    return results.aic
+    return {"aic": results.aic, "bic": results.bic, "loglikelihood": results.loglikelihood}
 
 # Define the parameter grid
 p_values = range(1,4)
@@ -54,27 +54,36 @@ parameter_grid = pd.DataFrame(parameter_grid,columns= ['p_order','q_order','o_or
                                                        'vol_type_values',
                                                        'distribution_values'])
 # Initialize variables to store the best results
-best_aic = np.inf
 best_params = None
+results_df = pd.DataFrame()
 
 # Perform grid search
 for i in range(parameter_grid.shape[0]):
     try:
         p_order, q_order, o_order, mean_type, vol_type, dist_type = parameter_grid.iloc[i, :]
         p_order, q_order, o_order = int(p_order),int(q_order),int(o_order)
-        aic = fit_evaluate_garch(p_order, q_order, o_order ,mean_type, vol_type ,dist_type)
+        candidate = fit_evaluate_garch(p_order, q_order, o_order ,mean_type, vol_type ,dist_type)
+        results_df = results_df.append({'aic': candidate['aic'],
+                                        'sbc': candidate['bic'],
+                                        'loglikelihood': candidate['loglikelihood']},
+                          ignore_index=True)
         print(f'Itteration {i} of {parameter_grid.shape[0]} AIC: {aic}')
-        if aic < best_aic:
-            best_aic = aic
-            best_params = (p_order, q_order,o_order, mean_type,vol_type ,dist_type)
     except:
         continue
 
-print("Best AIC:", best_aic)
-print("Best (p, q) values:", best_params)
+# multiple ranking on performance criteria
+results_df['rank_aic'] = results_df['aic'].rank()
+results_df['rank_sbc'] = results_df['sbc'].rank()
+results_df['rank_loglik'] = results_df['loglikelihood'].rank(ascending=False)
+results_df['rank_total'] = results_df.eval('(rank_aic + rank_sbc + rank_loglik) /3 ')
+
+# best possible model
+best_pos = results_df['rank_total'].argmin()
+results_df.drop(['rank_aic', 'rank_sbc', 'rank_loglik','rank_total'], axis=1, inplace=True)
+best_p, best_q, best_o, best_mean, best_vol, best_dist = parameter_grid.iloc[best_pos,:]
 
 # Fit the best model to the full data
-best_p, best_q, best_o, best_mean, best_vol, best_dist = best_params
+best_p, best_q, best_o = int(best_p),int(best_q),int(best_o)
 best_model = arch.arch_model(ts, vol=best_vol, p=best_p, q=best_q, o = best_o,
                              mean=best_mean, dist=best_dist)
 best_results = best_model.fit()
@@ -92,7 +101,7 @@ bm_std = best_results.conditional_volatility
 bm_std_resid = bm_resid /bm_std
 
 # Plot the histogram of the standardized residuals
-plt.hist(bm_std, bins=50,
+plt.hist(bm_std_resid, bins=50,
          facecolor='orange', label='Standardized residuals')
 plt.legend(loc='upper left')
 plt.show()
@@ -108,9 +117,6 @@ plt.plot(ts, color='grey', alpha=0.4, label='Price Returns')
 plt.plot(bm_std, color='gold', label='Best Model Volatility')
 plt.legend(loc='upper right')
 plt.show()
-
-# Print each models BIC
-print(f'Best model BIC: {best_results.bic}')
 
 #Fixed rolling window forecast
 ts.index = raw.index
