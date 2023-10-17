@@ -7,10 +7,11 @@ import matplotlib.pyplot as plt
 import arch
 from fetch_equity import crypto, asset
 from itertools import product
+from statsmodels.stats.diagnostic import acorr_ljungbox
 
 
 # select asset
-asset_series = asset(symbol='aapl',granularity='1d', start= '2023-01-01', end='2023-10-01')
+asset_series = asset(symbol='vusa.as',granularity='1d', start= '2023-01-01', end='2023-10-10')
 print(asset_series)
 raw = asset_series.fetch_asset()
 
@@ -36,7 +37,9 @@ def fit_evaluate_garch(p_order, q_order, o_order,mean_type, vol_type ,dist_type 
     model = arch.arch_model(y = ts, vol= vol_type ,p = p_order, q = q_order,
                             o = o_order, mean = mean_type , dist = dist_type)
     results = model.fit(disp='off')
-    return {"aic": results.aic, "bic": results.bic, "loglikelihood": results.loglikelihood}
+    return {"aic": results.aic,
+            "bic": results.bic,
+            "loglikelihood": results.loglikelihood}
 
 # Define the parameter grid
 p_values = range(1,4)
@@ -68,7 +71,7 @@ for i in range(parameter_grid.shape[0]):
                                         'sbc': candidate['bic'],
                                         'loglikelihood': candidate['loglikelihood']},
                           ignore_index=True)
-        print(f'Itteration {i} of {parameter_grid.shape[0]} AIC: {aic}')
+        print(f'Itteration {i} of {parameter_grid.shape[0]} ')
     except:
         continue
 
@@ -81,45 +84,18 @@ results_df['rank_total'] = results_df.eval('(rank_aic + rank_sbc + rank_loglik) 
 # best possible model
 best_pos = results_df['rank_total'].argmin()
 results_df.drop(['rank_aic', 'rank_sbc', 'rank_loglik','rank_total'], axis=1, inplace=True)
-best_p, best_q, best_o, best_mean, best_vol, best_dist = parameter_grid.iloc[best_pos,:]
+best_p, best_q, best_o, best_mean, best_vol, best_dist = parameter_grid.iloc[best_pos,:] # here check for skiped models
 
 # Fit the best model to the full data
 best_p, best_q, best_o = int(best_p),int(best_q),int(best_o)
 best_model = arch.arch_model(ts, vol=best_vol, p=best_p, q=best_q, o = best_o,
                              mean=best_mean, dist=best_dist)
-best_results = best_model.fit()
+best_results = best_model.fit(disp='off')
 
 # Visualize results
 best_results.plot()
 
-#Plot distribution of standardized residuals
-
-# Obtain model estimated residuals and volatility
-bm_resid = best_results.resid
-bm_std = best_results.conditional_volatility
-
-# Calculate the standardized residuals
-bm_std_resid = bm_resid /bm_std
-
-# Plot the histogram of the standardized residuals
-plt.hist(bm_std_resid, bins=50,
-         facecolor='orange', label='Standardized residuals')
-plt.legend(loc='upper left')
-plt.show()
-
-# Plot model volatility
-plt.plot(bm_std, color='blue', label='Best Model Volatility')
-plt.legend(loc='upper right')
-plt.show()
-
-# Plot the actual Bitcoin returns
-plt.plot(ts, color='grey', alpha=0.4, label='Price Returns')
-# Plot GJR-GARCH estimated volatility
-plt.plot(bm_std, color='gold', label='Best Model Volatility')
-plt.legend(loc='upper right')
-plt.show()
-
-#Fixed rolling window forecast
+# #Fixed rolling window forecast
 ts.index = raw.index
 index = ts.index
 start_loc = 0
@@ -164,65 +140,12 @@ print(variance_fixedwin.head(15))
 # Print model fitting summary
 print(best_results.summary())
 
-# Get parameter stats from model summary
-para_summary = pd.DataFrame({'parameter':best_results.params,
-                             'p-value': best_results.pvalues})
+
 
 # Print out parameter stats
 print(para_summary)
 
-## Simplify the model with t-statistics
 
-# Get parameter stats from model summary
-para_summary = pd.DataFrame({'parameter':best_results.params,
-                             'std-err': best_results.std_err,
-                             't-value': best_results.tvalues})
-# Print parameter stats
-print(para_summary)
-
-## ACF plot
-# Import the Python module
-from statsmodels.graphics.tsaplots import plot_acf
-
-# Plot the standardized residuals
-plt.plot(best_results.std_resid.dropna())
-plt.title('Standardized Residuals')
-plt.show()
-
-# Generate ACF plot of the standardized residuals
-plot_acf(best_results.resid.dropna(), alpha = 0.05)
-plt.show()
-
-## Ljung-Box test
-
-# Import the Python module
-from statsmodels.stats.diagnostic import acorr_ljungbox
-
-# Perform the Ljung-Box test
-lb_test = acorr_ljungbox(best_results.std_resid , lags = 10)
-
-# Store p-values in DataFrame
-df = pd.DataFrame({'P-values': lb_test['lb_pvalue']}).T
-
-# Create column names for each lag
-col_num = df.shape[1]
-col_names = ['lag_'+str(num) for num in list(range(1,col_num+1,1))]
-
-# Display the p-values
-df.columns = col_names
-df
-
-# Display the significant lags
-mask = df < 0.05
-df[mask].dropna(axis=1)
-
-# Print the log-likelihodd of normal GARCH
-print('Log-likelihood of best model :', best_results.loglikelihood)
-
-## Pick a winner based on AIC/BIC
-## The lower the AIC or BIC, the better the model.
-# Print the AIC GJR-GARCH
-print('AIC of best model :', best_results.aic)
 
 
 
