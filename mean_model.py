@@ -1,16 +1,16 @@
 from fetch_equity import crypto, asset
 import pandas as pd
 # select asset
-asset_series = asset(symbol='VUSA.AS',granularity='1d', start= '2019-01-01', end='2023-06-25')
+asset_series = crypto(symbol='btc',granularity='1d', start= '2023-01-01', end='2023-06-25')
 print(asset_series)
-raw = asset_series.fetch_asset()
+raw = asset_series.fetch_crypto()
 #raw.set_index('date',inplace=True)
 ts = raw['return'].copy()
 
 
 class mean_model:
     """
-        A class used to represent the optimal AutoRegressive model to be used as a mean model in GARCH
+        A class used to represent the optimal AutoRegressive model to be used as a mean AR model the prediction committee
 
         ...
         Attributes
@@ -161,7 +161,6 @@ class mean_model:
             plt.show()
 
         return(model)
-
 '''
 # sample use
 mm = mean_model(ts = ts,hold_out= 0.8,stationarity= False,diagnostics=False)
