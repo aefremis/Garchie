@@ -1,28 +1,12 @@
-# libs and data
-import pandas as pd
-import numpy as np
-import matplotlib
-matplotlib.use("TkAgg")
-import matplotlib.pyplot as plt
-import arch
 from fetch_equity import crypto, asset
-from itertools import product
-from statsmodels.stats.diagnostic import acorr_ljungbox
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-from arch.__future__ import reindexing
-
-
+import pandas as pd
 # select asset
-asset_series = asset(symbol='IBM',granularity='1d', start= '2023-01-01', end='2023-11-21')
+asset_series = asset(symbol='IBM', granularity='1d', start='2023-01-01', end='2023-11-21')
 print(asset_series)
 raw = asset_series.fetch_asset()
 raw.reset_index(inplace=True)
-
-#raw.set_index('date',inplace=True)
 ts = raw['return'].copy()
-forecast_ahead = 7
-fixed_window = False
-diagnostics = True
+
 
 class garch_model:
     """
@@ -34,7 +18,7 @@ class garch_model:
         ts : dataframe
             a dataframe that contains the asset information
         forecast_ahead : integer
-            a number dictates the forecasting horizon and holdout evaluation window
+            a number that dictates the forecasting horizon and holdout evaluation window
         fixed_window : bool
             a boolean that chooses between rolling and fixed window forecast for the evaluation
         diagnostics : bool
@@ -72,16 +56,19 @@ class garch_model:
 
         Parameters
         ----------
-        p_order :
-        q_order :
-        o_order :
-        mean_type :
-        vol_type :
-        dist_type :
+        p_order : integer
+        Lag order of the symmetric innovation
+        q_order : integer
+        Lag order of lagged volatility
+        o_order : integer
+        Lag order of the asymmetric innovation
+        mean_type : Name of the mean model
+        vol_type : Name of the volatility model
+        dist_type : Name of the error distribution
 
         Returns
         -------
-        DataFrame
+        DataFrame :
         a dictionary of performance metrics (aic, bic, loglikelihood)
         """
         model = arch.arch_model(y=self.ts, vol=vol_type, p=p_order, q=q_order,
@@ -98,12 +85,14 @@ class garch_model:
 
         Parameters
         ----------
-        observation :
-        forecast :
+        observation : array
+        observed variance in hold-out period
+        forecast : array
+        predicted variance in hold-out period
 
         Returns
         -------
-        List
+        List : list
         a list of accuracy metrics (mae, mse)
         """
         # Call sklearn function to calculate MAE
@@ -128,6 +117,12 @@ class garch_model:
         conf
         a volatility based confidence interval for any given mean prediction
         """
+        import numpy as np
+        import arch
+        from itertools import product
+        from sklearn.metrics import mean_absolute_error, mean_squared_error
+        from arch.__future__ import reindexing
+
         # Define the parameter grid
         p_values = range(1, 4)
         q_values = range(3)
@@ -219,17 +214,19 @@ class garch_model:
         observed_var = raw['return'].tail(forecast_ahead).sub(raw['return'].tail(forecast_ahead).mean()).pow(2)
         evaluate(observed_var, variance_holdout)
 
-        '''
-        # Plot the actual  volatility
-        bm_std = best_results.conditional_volatility
-        plt.plot(raw['return'].sub(raw['return'].mean()).pow(2),
-                 color = 'grey', alpha = 0.4, label = 'Daily Volatility')
+        if self.diagnostics:
+            import matplotlib
+            matplotlib.use("TkAgg")
+            import matplotlib.pyplot as plt
+            # Plot the actual  volatility
+            bm_std = best_results.conditional_volatility
+            plt.plot(raw['return'].sub(raw['return'].mean()).pow(2),
+                     color='grey', alpha=0.4, label='Daily Volatility')
 
-        # Plot EGARCH  estimated volatility
-        plt.plot(bm_std**2, color = 'red', label = 'Best Model Volatility')
-        plt.legend(loc = 'upper right')
-        plt.show()
-        '''
+            # Plot EGARCH  estimated volatility
+            plt.plot(bm_std ** 2, color='red', label='Best Model Volatility')
+            plt.legend(loc='upper right')
+            plt.show()
 
         if best_vol == 'EGARCH':
             forecast = best_results.forecast(horizon=forecast_ahead, method="bootstrap").variance.T
@@ -240,5 +237,9 @@ class garch_model:
         return(conf)
 
 
+# sample run
+gg = garch_model(ts=ts, forecast_ahead=7, fixed_window=False, diagnostics=False)
+print(gg)
+gg.design_garch_model()
 
 
