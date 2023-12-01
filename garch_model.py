@@ -71,6 +71,7 @@ class garch_model:
         DataFrame :
         a dictionary of performance metrics (aic, bic, loglikelihood)
         """
+        import arch
         model = arch.arch_model(y=self.ts, vol=vol_type, p=p_order, q=q_order,
                                 o=o_order, mean=mean_type, dist=dist_type)
         results = model.fit(disp='off')
@@ -95,6 +96,7 @@ class garch_model:
         List : list
         a list of accuracy metrics (mae, mse)
         """
+        from sklearn.metrics import mean_absolute_error, mean_squared_error
         # Call sklearn function to calculate MAE
         mae = mean_absolute_error(observation, forecast)
         print('Mean Absolute Error (MAE): {:.3g}'.format(mae))
@@ -120,7 +122,6 @@ class garch_model:
         import numpy as np
         import arch
         from itertools import product
-        from sklearn.metrics import mean_absolute_error, mean_squared_error
         from arch.__future__ import reindexing
 
         # Define the parameter grid
@@ -180,7 +181,7 @@ class garch_model:
             ts.index = raw.date
             index = ts.index
             start_loc = 0
-            end_loc = len(index) - forecast_ahead
+            end_loc = len(index) - self.forecast_ahead
             forecasts = {}
             for i in range(len(ts) - end_loc):
                 sys.stdout.write('o')
@@ -196,7 +197,7 @@ class garch_model:
             ts.index = raw.date
             index = ts.index
             start_loc = 0
-            end_loc = len(index) - forecast_ahead
+            end_loc = len(index) - self.forecast_ahead
             forecasts = {}
             for i in range(len(ts) - end_loc):
                 sys.stdout.write('-')
@@ -211,8 +212,8 @@ class garch_model:
             # print(best_results.summary())
 
         # Backtest model with MAE, MSE
-        observed_var = raw['return'].tail(forecast_ahead).sub(raw['return'].tail(forecast_ahead).mean()).pow(2)
-        evaluate(observed_var, variance_holdout)
+        observed_var = raw['return'].tail(self.forecast_ahead).sub(raw['return'].tail(self.forecast_ahead).mean()).pow(2)
+        self.evaluate(observed_var, variance_holdout)
 
         if self.diagnostics:
             import matplotlib
@@ -229,17 +230,18 @@ class garch_model:
             plt.show()
 
         if best_vol == 'EGARCH':
-            forecast = best_results.forecast(horizon=forecast_ahead, method="bootstrap").variance.T
+            forecast = best_results.forecast(horizon=self.forecast_ahead, method="bootstrap").variance.T
         else:
-            forecast = best_results.forecast(horizon=forecast_ahead).variance.T
+            forecast = best_results.forecast(horizon=self.forecast_ahead).variance.T
 
         conf = np.sqrt(forecast) * 1.96
         return(conf)
 
 
 # sample run
+'''
 gg = garch_model(ts=ts, forecast_ahead=7, fixed_window=False, diagnostics=False)
 print(gg)
 gg.design_garch_model()
-
+'''
 
