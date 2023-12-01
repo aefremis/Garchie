@@ -8,6 +8,7 @@ raw.reset_index(inplace=True)
 ts = raw['return'].copy()
 
 
+
 class garch_model:
     """
         A class used to represent the optimal GARCH  model to be used as a volatility model to the prediction committee
