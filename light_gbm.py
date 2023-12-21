@@ -5,7 +5,7 @@ import statsmodels.api as sm
 import lightgbm as gbm
 
 # select asset
-asset_series = asset(symbol='vusa.as', granularity='1d', start='2023-01-01', end='2023-11-21')
+asset_series = asset(symbol='IBM', granularity='1d', start='2023-01-01', end='2023-12-10')
 print(asset_series)
 raw = asset_series.fetch_asset()
 raw['typical_price'] = np.round((raw['high'] + raw['low'] + raw['close']) / 3,2)
@@ -27,3 +27,7 @@ significant_count = sum(acf > 0.90 for acf in acf_val)
 # build lag covariates
 for i in range(1,significant_count+1):
     ts[f'lag_{i}'] = ts['typical_price'].shift(i)
+
+# keep complete cases
+ts.dropna(axis='rows', inplace=True)
+
