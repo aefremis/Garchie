@@ -1,7 +1,7 @@
 from fetch_equity import crypto, asset
 import pandas as pd
 # select asset
-asset_series = asset(symbol='IBM', granularity='1d', start='2023-01-01', end='2023-11-21')
+asset_series = asset(symbol='IBM', granularity='1d', start='2023-01-01', end='2023-12-29')
 print(asset_series)
 raw = asset_series.fetch_asset()
 raw.reset_index(inplace=True)
@@ -151,10 +151,12 @@ class garch_model:
                 p_order, q_order, o_order, mean_type, vol_type, dist_type = parameter_grid.iloc[i, :]
                 p_order, q_order, o_order = int(p_order), int(q_order), int(o_order)
                 candidate = self.fit_evaluate_garch(p_order, q_order, o_order, mean_type, vol_type, dist_type)
-                results_df = results_df.append({'aic': candidate['aic'],
-                                                'sbc': candidate['bic'],
-                                                'loglikelihood': candidate['loglikelihood']},
-                                               ignore_index=True)
+                global_fit_dic = {'aic': candidate['aic'],
+                                  'sbc': candidate['bic'],
+                                  'loglikelihood': candidate['loglikelihood']
+                                 }
+                temp_df = pd.DataFrame.from_dict([global_fit_dic])
+                results_df = pd.concat([results_df,temp_df])
                 print(f'Itteration {i} of {parameter_grid.shape[0]} ')
             except:
                 continue

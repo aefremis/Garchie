@@ -1,9 +1,8 @@
-from fetch_equity import  asset
-import matplotlib
-matplotlib.use("TkAgg")
+from fetch_equity import  asset, crypto
+#matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import seaborn as sns
-plt.interactive(False)
+#plt.interactive(False)
 plt.style.use('ggplot')
 import pandas as pd
 import numpy as np
