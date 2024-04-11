@@ -19,7 +19,10 @@ ts = raw[['date', 'typical_price']].copy()
 # build covariates based on granularity / now only daily for prototype
 new_cols = ['quarter', 'month', 'week', 'day', 'dayofweek']
 for i in new_cols:
-    ts[f'{i}'] = eval('ts["date"].dt.'+i)
+    if i != 'week':
+       ts[f'{i}'] = eval('ts["date"].dt.'+i)
+    else: 
+       ts[f'{i}'] = eval('ts["date"].dt.isocalendar().'+i)
 
 ts['wom'] = ts["date"].apply(lambda d: (d.day-1) // 7 + 1)
 ts.set_index('date', inplace=True)
