@@ -40,7 +40,7 @@ for i in range(1,significant_count+1):
 ts.dropna(axis='rows', inplace=True)
 
 # train test split
-hold_out = 0.99
+hold_out = 0.9
 if  hold_out != 0.8:
     train_size = hold_out
 else:
@@ -62,11 +62,11 @@ fixed_params = {
 }
 
 search_params = {
-    'max_depth': [3, 4, 6, 5, 10],
-    'num_leaves': [12, 20, 32],
-    'learning_rate': [0.01, 0.05, 0.1],
-    'n_estimators': [100, 200],
-    'feature_fraction': [0.8, 0.9],
+    'max_depth': [3, 4, 6, 5, 10], #3
+    'num_leaves': [12, 20, 32], #12
+    'learning_rate': [0.01, 0.05, 0.1], #0.1
+    'n_estimators': [100, 200], # 100
+    'feature_fraction': [0.8, 0.9], #0.9
 }
 
 base_model = LGBMRegressor(**fixed_params)
@@ -107,3 +107,50 @@ column_info = [(col, str(dt)) for col, dt in zip(ts.columns, ts.dtypes)]
 forecast_df = pd.DataFrame(columns=[col for col, _ in column_info])
 forecast_df['typical_price']=np.repeat(np.NaN,7,axis=0)
 forecast_df.set_index(new_index_range, inplace=True)
+
+forecast_df.reset_index(inplace=True)
+forecast_df.rename(columns={'index':'date'},
+                   inplace=True)
+
+for i in new_cols:
+    if i != 'week':
+       forecast_df[f'{i}'] = eval('forecast_df["date"].dt.'+i)
+    else: 
+       forecast_df[f'{i}'] = eval('forecast_df["date"].dt.isocalendar().'+i)
+
+forecast_df['wom'] = forecast_df["date"].apply(lambda d: (d.day-1) // 7 + 1)
+forecast_df.set_index('date', inplace=True)
+
+
+# add lags to forecast df
+forecast_df.at[forecast_df.index[0],'lag_1'] = y.iloc[-1]
+forecast_df.at[forecast_df.index[0],'lag_2'] = y.iloc[-2]
+
+temp_newdata = forecast_df.loc[[forecast_df.index[0]], ~forecast_df.columns.isin(['typical_price'])]
+temp_newdata.dtypes
+temp_newdata['lag_1'] = temp_newdata['lag_1'].astype(float)
+temp_newdata['lag_2'] = temp_newdata['lag_2'].astype(float)
+
+prediction_step = best_model.predict(temp_newdata)
+
+forecast_df.at[forecast_df.index[0],'typical_price'] = prediction_step[0].round(2)
+
+forecast_df.at[forecast_df.index[1],'lag_1'] = prediction_step[0].round(2)
+forecast_df.at[forecast_df.index[1],'lag_2'] = forecast_df.at[forecast_df.index[0],'lag_1']
+
+# second itteration
+temp_newdata = forecast_df.loc[[forecast_df.index[1]], ~forecast_df.columns.isin(['typical_price'])]
+temp_newdata.dtypes
+temp_newdata['lag_1'] = temp_newdata['lag_1'].astype(float)
+temp_newdata['lag_2'] = temp_newdata['lag_2'].astype(float)
+
+prediction_step = best_model.predict(temp_newdata)
+
+forecast_df.at[forecast_df.index[1],'typical_price'] = prediction_step[0].round(2)
+
+forecast_df.at[forecast_df.index[2],'lag_1'] = prediction_step[0].round(2)
+forecast_df.at[forecast_df.index[2],'lag_2'] = forecast_df.at[forecast_df.index[1],'lag_1']
+
+# now generalize 
+
+
