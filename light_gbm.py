@@ -62,11 +62,11 @@ fixed_params = {
 }
 
 search_params = {
-    'max_depth': [3, 4, 6, 5, 10], #3
-    'num_leaves': [12, 20, 32], #12
-    'learning_rate': [0.01, 0.05, 0.1], #0.1
-    'n_estimators': [100, 200], # 100
-    'feature_fraction': [0.8, 0.9], #0.9
+    'max_depth': [3, 4], #, 6, 5, 10
+    'num_leaves': [12], #,20, 32
+    'learning_rate': [0.1], #0.01, 0.05,
+    'n_estimators': [100], # 200
+    'feature_fraction': [0.9], #0.8
 }
 
 base_model = LGBMRegressor(**fixed_params)
@@ -122,35 +122,32 @@ forecast_df['wom'] = forecast_df["date"].apply(lambda d: (d.day-1) // 7 + 1)
 forecast_df.set_index('date', inplace=True)
 
 
-# add lags to forecast df
-forecast_df.at[forecast_df.index[0],'lag_1'] = y.iloc[-1]
-forecast_df.at[forecast_df.index[0],'lag_2'] = y.iloc[-2]
+if significant_count > 0:
+    lag_sequence = np.arange(1, significant_count + 1)
+    forecast_df.loc[forecast_df.index[0], [f'lag_{i}' for i in lag_sequence]] = y.tail(significant_count).values
 
-temp_newdata = forecast_df.loc[[forecast_df.index[0]], ~forecast_df.columns.isin(['typical_price'])]
-temp_newdata.dtypes
-temp_newdata['lag_1'] = temp_newdata['lag_1'].astype(float)
-temp_newdata['lag_2'] = temp_newdata['lag_2'].astype(float)
+    # add lags to forecast df
+    for pred_step in np.arange(7):
+        temp_newdata = forecast_df.loc[[forecast_df.index[pred_step]], ~forecast_df.columns.isin(['typical_price'])]
+        temp_newdata[[f'lag_{i}' for i in lag_sequence]] = temp_newdata[[f'lag_{i}' for i in lag_sequence]].astype(float)
+        # temp_newdata.dtypes
+        print(pred_step)
 
-prediction_step = best_model.predict(temp_newdata)
+        # prediction step for one step ahead
+        prediction_step = best_model.predict(temp_newdata)
+        forecast_df.at[forecast_df.index[pred_step], 'typical_price'] = prediction_step[0].round(2)
+        forecast_df.at[forecast_df.index[pred_step + 1], 'lag_1'] = prediction_step[0].round(2)
 
-forecast_df.at[forecast_df.index[0],'typical_price'] = prediction_step[0].round(2)
+        if len(lag_sequence) > 1:
+            for lag_step in lag_sequence[:-1]:
+                forecast_df.at[forecast_df.index[pred_step + 1], f'lag_{lag_step + 1}'] = forecast_df.at[forecast_df.index[pred_step], f'lag_{lag_step}']
+        else:
+            print("ok")
 
-forecast_df.at[forecast_df.index[1],'lag_1'] = prediction_step[0].round(2)
-forecast_df.at[forecast_df.index[1],'lag_2'] = forecast_df.at[forecast_df.index[0],'lag_1']
+else:
+    temp_newdata = forecast_df.loc[:, ~forecast_df.columns.isin(['typical_price'])]
+    forecast_df['typical_price'] = best_model.predict(temp_newdata)
 
-# second itteration
-temp_newdata = forecast_df.loc[[forecast_df.index[1]], ~forecast_df.columns.isin(['typical_price'])]
-temp_newdata.dtypes
-temp_newdata['lag_1'] = temp_newdata['lag_1'].astype(float)
-temp_newdata['lag_2'] = temp_newdata['lag_2'].astype(float)
-
-prediction_step = best_model.predict(temp_newdata)
-
-forecast_df.at[forecast_df.index[1],'typical_price'] = prediction_step[0].round(2)
-
-forecast_df.at[forecast_df.index[2],'lag_1'] = prediction_step[0].round(2)
-forecast_df.at[forecast_df.index[2],'lag_2'] = forecast_df.at[forecast_df.index[1],'lag_1']
-
-# now generalize 
+# fix last step warning 
 
 
