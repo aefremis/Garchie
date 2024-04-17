@@ -17,16 +17,18 @@ raw['typical_price'] = np.round((raw['high'] + raw['low'] + raw['close']) / 3,2)
 ts = raw[['date', 'typical_price']].copy()
 
 # build covariates based on granularity / now only daily for prototype
-new_cols = ['quarter', 'month', 'week', 'day', 'dayofweek']
-for i in new_cols:
-    if i != 'week':
-       ts[f'{i}'] = eval('ts["date"].dt.'+i)
-    else: 
-       ts[f'{i}'] = eval('ts["date"].dt.isocalendar().'+i)
+def design_date_covariates(data):
+    new_cols = ['quarter', 'month', 'week', 'day', 'dayofweek']
+    for i in new_cols:
+        if i != 'week':
+            data[f'{i}'] = eval('data["date"].dt.'+i)
+        else: 
+            data[f'{i}'] = eval('data["date"].dt.isocalendar().'+i)
 
-ts['wom'] = ts["date"].apply(lambda d: (d.day-1) // 7 + 1)
-ts.set_index('date', inplace=True)
+    data['wom'] = data["date"].apply(lambda d: (d.day-1) // 7 + 1)
+    data.set_index('date', inplace=True)
 
+design_date_covariates(ts)   
 # decide on lag number via acf
 acf_values = sm.tsa.stattools.acf(ts['typical_price'], nlags=len(ts)-1)
 acf_val = acf_values[1:]
@@ -112,15 +114,7 @@ forecast_df.reset_index(inplace=True)
 forecast_df.rename(columns={'index':'date'},
                    inplace=True)
 
-for i in new_cols:
-    if i != 'week':
-       forecast_df[f'{i}'] = eval('forecast_df["date"].dt.'+i)
-    else: 
-       forecast_df[f'{i}'] = eval('forecast_df["date"].dt.isocalendar().'+i)
-
-forecast_df['wom'] = forecast_df["date"].apply(lambda d: (d.day-1) // 7 + 1)
-forecast_df.set_index('date', inplace=True)
-
+design_date_covariates(forecast_df)
 
 if significant_count > 0:
     lag_sequence = np.arange(1, significant_count + 1)
