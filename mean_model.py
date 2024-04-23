@@ -163,7 +163,7 @@ class mean_model:
         return(model)
 '''
 # sample use
-mm = mean_model(ts = ts,hold_out= 0.8,stationarity= False,diagnostics=True)
+mm = mean_model(ts = ts,hold_out= 0.8,stationarity= False,diagnostics=False)
 print(mm)
 mm.design_mean_model()
 '''
