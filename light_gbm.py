@@ -7,6 +7,8 @@ from lightgbm import LGBMRegressor
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error, mean_squared_error
 from datetime import date, timedelta
+import matplotlib
+import matplotlib.pyplot as plt 
 
 
 # select asset
@@ -54,6 +56,14 @@ split_idx = round(len(ts) * train_size)
 train, test = ts.iloc[:split_idx], ts.iloc[split_idx:]
 cv_split = TimeSeriesSplit(n_splits=4, test_size=100)
 
+# visualize split
+fig, ax = plt.subplots(figsize=(12, 8))
+plt.plot(train['typical_price'], label='Train', marker='.')
+plt.plot(test['typical_price'], label='Test', marker='.')
+ax.legend(bbox_to_anchor=[1, 1])
+plt.show()
+
+
 # hyperparameters tuning - cv
 fixed_params = {
     'objective': 'regression',
@@ -95,6 +105,20 @@ def evaluate_model(y_test, prediction):
   print(f"MAPE: {mean_absolute_percentage_error(y_test, prediction)}")
 
 evaluate_model(y_test,prediction)
+
+# visualize model predicting test data
+
+pred_df = pd.DataFrame({'pred': prediction})
+pred_df.set_index(test.index, inplace=True)
+fig, ax = plt.subplots(figsize=(12, 7))
+ax.plot(train['typical_price'], label='Train', marker='.')
+ax.plot(test['typical_price'], label='Test', marker='.')
+ax.plot(pred_df['pred'], label='Prediction', ls='--', linewidth=1)
+ax.fill_between(x=pred_df.index, y1=pred_df['lower'], y2=pred_df['upper'], alpha=0.3)
+ax.set_title('Model Validation', fontsize=22)
+ax.legend(loc='upper left')
+fig.tight_layout()
+plt.show()
 
 #train model on full data
 X = ts.loc[:, ts.columns != 'typical_price']
@@ -142,6 +166,15 @@ else:
     temp_newdata = forecast_df.loc[:, ~forecast_df.columns.isin(['typical_price'])]
     forecast_df['typical_price'] = best_model.predict(temp_newdata)
 
-# fix last step warning 
+# fix warning in step forecast
 
-
+# visualize forecasts
+fig, ax = plt.subplots(figsize=(12, 7))
+ax.plot(train['typical_price'], label='Train', marker='.')
+ax.plot(test['typical_price'], label='Test', marker='.')
+ax.plot(pred_df['pred'], label='Prediction', ls='--', linewidth=2)
+ax.plot(forecast_df['typical_price'], label='Prediction', marker = '.')
+ax.set_title('Model Predictions', fontsize=22)
+ax.legend(loc='upper left')
+fig.tight_layout()
+plt.show()
