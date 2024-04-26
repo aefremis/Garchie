@@ -114,7 +114,6 @@ fig, ax = plt.subplots(figsize=(12, 7))
 ax.plot(train['typical_price'], label='Train', marker='.')
 ax.plot(test['typical_price'], label='Test', marker='.')
 ax.plot(pred_df['pred'], label='Prediction', ls='--', linewidth=1)
-ax.fill_between(x=pred_df.index, y1=pred_df['lower'], y2=pred_df['upper'], alpha=0.3)
 ax.set_title('Model Validation', fontsize=22)
 ax.legend(loc='upper left')
 fig.tight_layout()
@@ -148,17 +147,19 @@ if significant_count > 0:
     for pred_step in np.arange(7):
         temp_newdata = forecast_df.loc[[forecast_df.index[pred_step]], ~forecast_df.columns.isin(['typical_price'])]
         temp_newdata[[f'lag_{i}' for i in lag_sequence]] = temp_newdata[[f'lag_{i}' for i in lag_sequence]].astype(float)
-        # temp_newdata.dtypes
-        print(pred_step)
 
         # prediction step for one step ahead
         prediction_step = best_model.predict(temp_newdata)
         forecast_df.at[forecast_df.index[pred_step], 'typical_price'] = prediction_step[0].round(2)
-        forecast_df.at[forecast_df.index[pred_step + 1], 'lag_1'] = prediction_step[0].round(2)
+        
+        if pred_step < max(np.arange(7)):
+            forecast_df.at[forecast_df.index[pred_step + 1], 'lag_1'] = prediction_step[0].round(2)
 
-        if len(lag_sequence) > 1:
-            for lag_step in lag_sequence[:-1]:
-                forecast_df.at[forecast_df.index[pred_step + 1], f'lag_{lag_step + 1}'] = forecast_df.at[forecast_df.index[pred_step], f'lag_{lag_step}']
+            if len(lag_sequence) > 1:
+                for lag_step in lag_sequence[:-1]:
+                    forecast_df.at[forecast_df.index[pred_step + 1], f'lag_{lag_step + 1}'] = forecast_df.at[forecast_df.index[pred_step], f'lag_{lag_step}']
+            else:
+                print("ok")
         else:
             print("ok")
 
@@ -172,7 +173,7 @@ else:
 fig, ax = plt.subplots(figsize=(12, 7))
 ax.plot(train['typical_price'], label='Train', marker='.')
 ax.plot(test['typical_price'], label='Test', marker='.')
-ax.plot(pred_df['pred'], label='Prediction', ls='--', linewidth=2)
+ax.plot(pred_df['pred'], label='Validation', ls='--', linewidth=2)
 ax.plot(forecast_df['typical_price'], label='Prediction', marker = '.')
 ax.set_title('Model Predictions', fontsize=22)
 ax.legend(loc='upper left')
