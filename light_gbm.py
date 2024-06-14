@@ -12,23 +12,74 @@ import matplotlib.pyplot as plt
 
 
 # select asset
-asset_series = asset(symbol='GPN', granularity='1d', start='2020-04-09', end='2024-01-05')
+asset_series = asset(symbol='GPN', granularity='1d', start='2020-04-09', end='2024-06-05')
 print(asset_series)
 raw = asset_series.fetch_asset()
 raw['typical_price'] = np.round((raw['high'] + raw['low'] + raw['close']) / 3,2)
 ts = raw[['date', 'typical_price']].copy()
 
-# build covariates based on granularity / now only daily for prototype
-def design_date_covariates(data):
-    new_cols = ['quarter', 'month', 'week', 'day', 'dayofweek']
-    for i in new_cols:
-        if i != 'week':
-            data[f'{i}'] = eval('data["date"].dt.'+i)
-        else: 
-            data[f'{i}'] = eval('data["date"].dt.isocalendar().'+i)
+class lgbm:
+    """
+        A class used to represent the optimal ldbm  model to be used as a mean model to the prediction committee
 
-    data['wom'] = data["date"].apply(lambda d: (d.day-1) // 7 + 1)
-    data.set_index('date', inplace=True)
+        ...
+        Attributes
+        ----------
+        ts : dataframe
+            a dataframe that contains the asset information
+        forecast_ahead : integer
+            a number that dictates the forecasting horizon and holdout evaluation window
+        diagnostics : bool
+            a boolean that prints the diagnostic/prediction plots
+
+        Methods
+        -------
+        design_lgbm_model()
+            Designs the optimal light gradient boosted model for a given time-series
+    """    
+    def __init__(self, ts, forecast_ahead, diagnostics):
+        """
+            Parameters
+            ----------
+            ts : dataframe
+                a dataframe that contains the asset information
+            forecast_ahead : integer
+                a number dictates the forecasting horizon and holdout evaluation window
+            diagnostics : bool
+                a boolean that prints the diagnostic/prediction plots
+        """
+        self.ts = ts
+        self.forecast_ahead = forecast_ahead
+        self.diagnostics = diagnostics
+    
+    def __str__(self):
+        return f"class of optimal lgbm model for the given asset"
+    
+    # build covariates based on granularity / now only daily for prototype
+    def design_date_covariates(self, data):
+                """
+        Fits a specified GARCH model and returns its performance metrics
+
+        Parameters
+        ----------
+        data : a dataset with a date column identifier
+
+        Returns
+        -------
+        DataFrame :
+        a dataframe of categorical time covariates
+        """
+        new_cols = ['quarter', 'month', 'week', 'day', 'dayofweek']
+        for i in new_cols:
+            if i != 'week':
+                data[f'{i}'] = eval('data["date"].dt.'+i)
+            else: 
+                data[f'{i}'] = eval('data["date"].dt.isocalendar().'+i)
+
+        data['wom'] = data["date"].apply(lambda d: (d.day-1) // 7 + 1)
+        data.set_index('date', inplace=True)
+                
+
 
 design_date_covariates(ts)   
 # decide on lag number via acf
@@ -111,7 +162,7 @@ evaluate_model(y_test,prediction)
 pred_df = pd.DataFrame({'pred': prediction})
 pred_df.set_index(test.index, inplace=True)
 fig, ax = plt.subplots(figsize=(12, 7))
-ax.plot(train['typical_price'], label='Train', marker='.')
+#ax.plot(train['typical_price'], label='Train', marker='.')
 ax.plot(test['typical_price'], label='Test', marker='.')
 ax.plot(pred_df['pred'], label='Prediction', ls='--', linewidth=1)
 ax.set_title('Model Validation', fontsize=22)
@@ -179,3 +230,5 @@ ax.set_title('Model Predictions', fontsize=22)
 ax.legend(loc='upper left')
 fig.tight_layout()
 plt.show()
+
+# see again tuning logic , make it a class , test lags generalization
