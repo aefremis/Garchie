@@ -1,11 +1,12 @@
 from fetch_equity import crypto, asset
 import pandas as pd
+import numpy as np
 # select asset
-asset_series = crypto(symbol='btc',granularity='1d', start= '2023-01-01', end='2023-06-25')
+asset_series = asset(symbol='GPN', granularity='1d', start='2021-01-01', end='2024-07-11')
 print(asset_series)
-raw = asset_series.fetch_crypto()
-#raw.set_index('date',inplace=True)
-ts = raw['return'].copy()
+raw = asset_series.fetch_asset()
+raw['typical_price'] = np.round((raw['high'] + raw['low'] + raw['close']) / 3,2)
+ts = raw[['date', 'typical_price']].copy()
 
 
 class mean_model:
@@ -68,10 +69,9 @@ class mean_model:
         from statsmodels.tsa.statespace.sarimax import SARIMAX
 
         import matplotlib
-        matplotlib.use("TkAgg")
         import matplotlib.pyplot as plt
         global model
-        if self.stationarity == True:
+        if self.stationarity:
             # stationarity -Dickey Fuller (add also kpss and decide on optimal diffs)
             # p value < 0.05 -- stationary time series
             dftest = adfuller(ts)
@@ -92,10 +92,10 @@ class mean_model:
         split_idx = round(len(ts)* train_size)
 
         # Split
-        train, test = ts.iloc[:split_idx], ts.iloc[split_idx:]
+        train, test = ts.iloc[:split_idx]['typical_price'], ts.iloc[split_idx:]['typical_price']
 
         # Visualize split
-        if self.diagnostics == True:
+        if self.diagnostics:
             fig, ax = plt.subplots(figsize=(12, 8))
             plt.plot(train, label='Train', marker='.')
             plt.plot(test, label='Test', marker='.')
@@ -114,11 +114,11 @@ class mean_model:
                                     start_p=0,
                                     start_q=0,
                                     seasonal=True)
-        if self.diagnostics == True:
+        if self.diagnostics:
             model.plot_diagnostics()
             plt.show()
 
-        if self.diagnostics == True:
+        if self.diagnostics:
             fc, conf_int = model.predict(n_periods=len(test), return_conf_int=True)
             pred_df = pd.DataFrame({'pred': fc,
                                     'lower': conf_int[:, 0],
@@ -135,20 +135,22 @@ class mean_model:
             fig.tight_layout()
             plt.show()
 
-            # predict future
-            best_model = SARIMAX(ts,
-                                 order=model.order,
-                                 seasonal_order=model.seasonal_order).fit()
+        # predict future
+        best_model = SARIMAX(ts,
+                            order=model.order,
+                            seasonal_order=model.seasonal_order).fit()
             # best_model.summary()
+        if self.diagnostics:
             best_model.plot_diagnostics()
             plt.show()
             # best_model.fittedvalues
 
-            forecast = best_model.get_forecast(steps=15)
-            pred_df = forecast.conf_int()
-            pred_df['pred'] = forecast.predicted_mean
-            pred_df.columns = ['lower', 'upper', 'pred']
+        forecast = best_model.get_forecast(steps=7)
+        pred_df = forecast.conf_int()
+        pred_df['pred'] = forecast.predicted_mean
+        pred_df.columns = ['lower', 'upper', 'pred']
 
+        if self.diagnostics:
             fig, ax = plt.subplots(figsize=(12, 7))
             ax.plot(train, label='Train', marker='.')
             ax.plot(test, label='Test', marker='.')
@@ -161,9 +163,9 @@ class mean_model:
             plt.show()
 
         return(model)
-'''
-# sample use
-mm = mean_model(ts = ts,hold_out= 0.8,stationarity= False,diagnostics=False)
+
+mm = mean_model(ts = ts,hold_out= 0.9,stationarity= False,diagnostics=True)
 print(mm)
 mm.design_mean_model()
-'''
+
+# debug predict future
