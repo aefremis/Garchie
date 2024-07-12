@@ -1,8 +1,8 @@
 from fetch_equity import crypto, asset
 import pandas as pd
-
+import numpy as np
 # select asset
-asset_series = asset(symbol='GPN', granularity='1d', start='2020-04-09', end='2024-06-05')
+asset_series = asset(symbol='GPN', granularity='1d', start='2021-01-01', end='2024-07-11')
 print(asset_series)
 raw = asset_series.fetch_asset()
 raw['typical_price'] = np.round((raw['high'] + raw['low'] + raw['close']) / 3,2)
@@ -39,6 +39,7 @@ class lgbm:
                 a boolean that prints the diagnostic/prediction plots
         """
         self.ts = ts
+        self.train_size = train_size
         self.forecast_ahead = forecast_ahead
         self.diagnostics = diagnostics
     
@@ -105,7 +106,6 @@ class lgbm:
         forecast_df :
         an array with forecasts
         """
-        import numpy as np
         import statsmodels.api as sm
         import lightgbm as gbm
         from lightgbm import LGBMRegressor
@@ -134,12 +134,13 @@ class lgbm:
         train, test = ts.iloc[:split_idx], ts.iloc[split_idx:]
         cv_split = TimeSeriesSplit(n_splits=4, test_size=100)
 
+        if self.diagnostics:
         # visualize split
-        fig, ax = plt.subplots(figsize=(12, 8))
-        plt.plot(train['typical_price'], label='Train', marker='.')
-        plt.plot(test['typical_price'], label='Test', marker='.')
-        ax.legend(bbox_to_anchor=[1, 1])
-        plt.show()
+            fig, ax = plt.subplots(figsize=(12, 8))
+            plt.plot(train['typical_price'], label='Train', marker='.')
+            plt.plot(test['typical_price'], label='Test', marker='.')
+            ax.legend(bbox_to_anchor=[1, 1])
+            plt.show()
 
 
         # hyperparameters tuning - cv
@@ -186,7 +187,7 @@ class lgbm:
             pred_df = pd.DataFrame({'pred': prediction})
             pred_df.set_index(test.index, inplace=True)
             fig, ax = plt.subplots(figsize=(12, 7))
-            #ax.plot(train['typical_price'], label='Train', marker='.')
+            ax.plot(train['typical_price'], label='Train', marker='.')
             ax.plot(test['typical_price'], label='Test', marker='.')
             ax.plot(pred_df['pred'], label='Prediction', ls='--', linewidth=1)
             ax.set_title('Model Validation', fontsize=22)
@@ -256,4 +257,12 @@ class lgbm:
             fig.tight_layout()
             plt.show()
 
-        # see again tuning logic , make it a class , test lags generalization
+        return(forecast_df)
+
+
+'''
+lg = lgbm(ts=ts,train_size = 0.9 ,forecast_ahead=7, diagnostics=True)
+print(lg)
+lg.design_lgbm_model()
+'''
+# see again tuning logic , test lags generalization
