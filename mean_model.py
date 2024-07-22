@@ -18,7 +18,7 @@ class mean_model:
         ----------
         ts : dataframe
             a dataframe that contains the asset information
-        hold_out : float
+        train_size : float
             a number that points to the size of the training set from 0 to 1 (default = 0.8)
         stationarity : bool
             a boolean that prints the stationarity tests
@@ -30,13 +30,13 @@ class mean_model:
         design_mean_model()
             Designs the optimal AutoRegressive model for a given time-series
         """
-    def __init__(self, ts, hold_out, stationarity, diagnostics):
+    def __init__(self, ts, train_size, stationarity, diagnostics):
         """
         Parameters
        ----------
         ts : dataframe
             a dataframe that contains the asset information
-        hold_out : float
+        train_size : float
             a number that points to the size of the training set from 0 to 1 (default = 0.8)
         stationarity : bool
             a boolean that prints the stationarity tests
@@ -44,7 +44,7 @@ class mean_model:
             a boolean that prints the diagnostic/prediction plots
         """
         self.ts = ts
-        self.hold_out = hold_out
+        self.train_size = train_size
         self.stationarity = stationarity
         self.diagnostics = diagnostics
 
@@ -83,13 +83,8 @@ class mean_model:
                 dfoutput['Critical Value (%s)' % key] = value
             print(dfoutput)
 
-        # Train Test Split Index
-        if self.hold_out != 0.8:
-            train_size = self.hold_out
-        else:
-            train_size = 0.8
-
-        split_idx = round(len(ts)* train_size)
+        
+        split_idx = round(len(ts)* self.train_size)
 
         # Split
         train, test = ts.iloc[:split_idx]['typical_price'], ts.iloc[split_idx:]['typical_price']
@@ -120,23 +115,23 @@ class mean_model:
 
         if self.diagnostics:
             fc, conf_int = model.predict(n_periods=len(test), return_conf_int=True)
-            pred_df = pd.DataFrame({'pred': fc,
+            test_df = pd.DataFrame({'pred': fc,
                                     'lower': conf_int[:, 0],
                                     'upper': conf_int[:, 1]})
-            pred_df.set_index(test.index, inplace=True)
+            test_df.set_index(test.index, inplace=True)
             fig, ax = plt.subplots(figsize=(12, 7))
             ax.plot(train, label='Train', marker='.')
             ax.plot(test, label='Test', marker='.')
-            ax.plot(pred_df['pred'], label='Prediction', ls='--', linewidth=3)
+            ax.plot(test_df['pred'], label='Prediction', ls='--', linewidth=3)
 
-            ax.fill_between(x=pred_df.index, y1=pred_df['lower'], y2=pred_df['upper'], alpha=0.3)
+            ax.fill_between(x=test_df.index, y1=test_df['lower'], y2=test_df['upper'], alpha=0.3)
             ax.set_title('Model Validation', fontsize=22)
             ax.legend(loc='upper left')
             fig.tight_layout()
             plt.show()
 
         # predict future
-        best_model = SARIMAX(ts,
+        best_model = SARIMAX(ts['typical_price'],
                             order=model.order,
                             seasonal_order=model.seasonal_order).fit()
             # best_model.summary()
@@ -162,10 +157,10 @@ class mean_model:
             fig.tight_layout()
             plt.show()
 
-        return(model)
+        return(pred_df)
 
-mm = mean_model(ts = ts,hold_out= 0.9,stationarity= False,diagnostics=True)
+'''
+mm = mean_model(ts = ts,train_size= 0.96,stationarity= False,diagnostics=True)
 print(mm)
-mm.design_mean_model()
-
-# debug predict future
+pred_df=mm.design_mean_model()
+'''
