@@ -23,5 +23,4 @@ forecast[['ds', 'yhat']].tail(14)
 
 fig = model.plot_components(forecast)
 from prophet.plot import plot_plotly, plot_components_plotly, pl
-
 plot_plotly(model, forecast).show()

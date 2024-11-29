@@ -137,7 +137,8 @@ class asset:
         raw = yf.download(self.symbol,
                           start=self.start,
                           end=self.end,
-                          interval=self.granularity)
+                          interval=self.granularity,
+                          multi_level_index=False)
 
         raw.drop('Adj Close', axis=1, inplace=True)
         raw.reset_index(inplace=True)
@@ -274,3 +275,4 @@ p3 = commodity(base_currency='USD', symbol= 'WTI OIL',granularity = 'd',start = 
 print(p3)
 raw = p3.fetch_commodity()
 '''
+
