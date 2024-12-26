@@ -53,7 +53,10 @@ cov_set.reset_index(inplace=True)
 cov_set = cov_set.rename(columns={'index' : 'date'})
 new_cols = ['month','week','day','dayofweek','quarter']
 for i in new_cols:
-    cov_set[f'{i}'] = eval('cov_set["date"].dt.'+i)
+            if i != 'week':
+                cov_set[f'{i}'] = eval('cov_set["date"].dt.'+i)
+            else: 
+                cov_set[f'{i}'] = eval('cov_set["date"].dt.isocalendar().'+i)
 
 cov_set['wom'] = cov_set["date"].apply(lambda d: (d.day-1) // 7 + 1)
 cov_set.set_index('date',inplace=True)
@@ -61,6 +64,8 @@ cov_set.set_index('date',inplace=True)
 #auto detect seasonality
 #split sets
 covariates = cov_set.loc[:,cov_set.columns.str.contains('close')==False].copy()
+covariates['week'] = covariates['week'].astype('int32')  # or 'int64' if preferred
+
 response = cov_set.loc[:,cov_set.columns.str.contains('close')==True].copy()
 
 #build model
@@ -88,7 +93,7 @@ plt.xticks(rotation = 45)
 plt.show()
 
 # plot seasonality and trend plots  # double or triple based on pvals based on mstl - to be added
-decompose_result_mult = seasonal_decompose(raw[['close']], period=90)
+decompose_result_mult = seasonal_decompose(raw[['close']], period=30)
 
 fig, axs = plt.subplots(ncols=2, nrows=2, figsize = (10,8))
 ax1, ax2, ax3, ax4 = axs.flat
