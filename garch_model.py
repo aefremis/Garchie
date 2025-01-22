@@ -8,7 +8,6 @@ raw.reset_index(inplace=True)
 ts = raw['return'].copy()
 
 
-
 class garch_model:
     """
         A class used to represent the optimal GARCH  model to be used as a volatility model to the prediction committee
@@ -124,6 +123,7 @@ class garch_model:
         import arch
         from itertools import product
         from arch.__future__ import reindexing
+        import sys
 
         # Define the parameter grid
         p_values = range(1, 4)
