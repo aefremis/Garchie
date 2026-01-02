@@ -26,3 +26,6 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Gemini related files
+GEMINI.md
