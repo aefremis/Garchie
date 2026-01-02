@@ -1,4 +1,4 @@
-from fetch_equity import crypto, asset
+from ..data import crypto, asset
 import pandas as pd
 # select asset
 asset_series = asset(symbol='IBM', granularity='1d', start='2023-01-01', end='2023-12-29')

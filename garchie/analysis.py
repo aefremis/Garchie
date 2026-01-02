@@ -1,4 +1,4 @@
-from fetch_equity import  asset, crypto
+from .data import  asset, crypto
 #matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import seaborn as sns

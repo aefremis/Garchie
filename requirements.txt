@@ -1,0 +1,14 @@
+pandas
+requests
+yfinance
+matplotlib
+seaborn
+numpy
+statsmodels
+plotly
+hampel
+arch
+scikit-learn
+prophet
+lightgbm
+pmdarima

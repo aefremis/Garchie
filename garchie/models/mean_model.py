@@ -1,4 +1,4 @@
-from fetch_equity import crypto, asset
+from ..data import crypto, asset
 import pandas as pd
 import numpy as np
 # select asset
