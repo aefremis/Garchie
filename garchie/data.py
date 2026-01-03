@@ -335,6 +335,11 @@ class commodity:
             print("Please ensure your API key is correct and that the symbol and interval are valid.")
             return pd.DataFrame()
 
+        print("--- (DEBUG) Raw data from Alpha Vantage ---")
+        print(raw.head())
+        print(raw.tail())
+        print("-----------------------------------------")
+
         # Filter data based on start and end dates
         raw.index = pd.to_datetime(raw.index)
         raw = raw[(raw.index >= self.start) & (raw.index <= self.end)]
@@ -344,6 +349,7 @@ class commodity:
             return raw
 
         raw.rename(columns={'value': 'close'}, inplace=True)
+        raw['close'] = pd.to_numeric(raw['close'], errors='coerce') # Ensure 'close' is numeric
         raw.sort_index(inplace=True)
         raw['return'] = (100 * raw['close'].pct_change())
         raw.dropna(axis=0, inplace=True)
