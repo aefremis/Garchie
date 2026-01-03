@@ -140,11 +140,11 @@ class asset:
                           interval=self.granularity,
                           multi_level_index=False)
 
-        raw.drop('Adj Close', axis=1, inplace=True)
+        raw.drop('Adj Close', axis=1, inplace=True, errors='ignore')
         raw.reset_index(inplace=True)
         raw.columns = raw.columns.str.lower()
-        raw['date'] = pd.to_datetime(raw['date'], unit='ms')
-        raw.set_index('date').sort_index()
+        raw['date'] = pd.to_datetime(raw['date'])
+        raw.sort_values(by='date', inplace=True)
         raw['return'] = (100 * raw['close'].pct_change())
         raw.dropna(axis = 0, inplace= True)
         return(raw)
