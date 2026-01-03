@@ -12,3 +12,4 @@ scikit-learn
 prophet
 lightgbm
 pmdarima
+alpha-vantage

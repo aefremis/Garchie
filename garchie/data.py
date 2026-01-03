@@ -304,7 +304,7 @@ class commodity:
 
         # --- ACTION REQUIRED ---
         # Replace "YOUR_API_KEY" with the key you obtained from Alpha Vantage
-        api_key = "YOUR_API_KEY"
+        api_key = "OVAYAKMDMRYMDVUU"
 
         com = Commodities(key=api_key, output_format='pandas')
         
@@ -319,12 +319,10 @@ class commodity:
                 'CORN': com.get_corn,
                 'COTTON': com.get_cotton,
                 'SUGAR': com.get_sugar,
-                'COFFEE': com.get_coffee,
-                'ALL_COMMODITIES': com.get_all_commodities,
+                'COFFEE': com.get_coffee
             }
             
             fetch_func = commodity_map.get(self.symbol.upper())
-            
             if fetch_func:
                 raw, meta_data = fetch_func(interval=self.granularity)
             else:
@@ -335,15 +333,10 @@ class commodity:
             print("Please ensure your API key is correct and that the symbol and interval are valid.")
             return pd.DataFrame()
 
-        print("--- (DEBUG) Raw data from Alpha Vantage ---")
-        print(raw.head())
-        print(raw.tail())
-        print("-----------------------------------------")
 
         # Filter data based on start and end dates
-        raw.index = pd.to_datetime(raw.index)
+        raw.index = pd.to_datetime(raw.date)
         raw = raw[(raw.index >= self.start) & (raw.index <= self.end)]
-        
         if raw.empty:
             print(f"Warning: No commodity data found for {self.symbol} in the specified date range.")
             return raw
@@ -354,9 +347,7 @@ class commodity:
         raw['return'] = (100 * raw['close'].pct_change())
         raw.dropna(axis=0, inplace=True)
 
-        raw.reset_index(inplace=True)
         raw.rename(columns={'index':'date'}, inplace=True)
-        
         return(raw)
 
 
