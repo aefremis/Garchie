@@ -134,11 +134,17 @@ class asset:
         """
         import pandas as pd
         import yfinance as yf
+        import requests
+
+        session = requests.Session()
+        session.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
+
         raw = yf.download(self.symbol,
                           start=self.start,
                           end=self.end,
                           interval=self.granularity,
-                          multi_level_index=False)
+                          multi_level_index=False,
+                          session=session)
 
         if raw.empty:
             print(f"Warning: Could not fetch data for {self.symbol}. It's possible the symbol is delisted, invalid, or that there's a temporary API issue.")
