@@ -140,6 +140,10 @@ class asset:
                           interval=self.granularity,
                           multi_level_index=False)
 
+        if raw.empty:
+            print(f"Warning: Could not fetch data for {self.symbol}. It's possible the symbol is delisted, invalid, or that there's a temporary API issue.")
+            return raw
+
         raw.drop('Adj Close', axis=1, inplace=True, errors='ignore')
         raw.reset_index(inplace=True)
         raw.columns = raw.columns.str.lower()
