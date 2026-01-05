@@ -12,13 +12,28 @@ ts = raw[['date', 'typical_price']].copy()
 
 class gam_model:
 
-    def __init__(self, ts, forecast_ahead, diagnostics):
+    def __init__(self, ts, forecast_ahead, forecast_unit, diagnostics=True):
         self.ts = ts
         self.forecast_ahead = forecast_ahead
+        self.forecast_unit = forecast_unit.lower()
         self.diagnostics = diagnostics 
 
     def __str__(self):
         return f"class of gam model"
+    
+
+       
+    def _get_freq(self):
+        freq_map = {
+            "days": "D",
+            "weeks": "W",
+            "months": "MS"  
+        }
+        if self.forecast_unit not in freq_map:
+            raise ValueError(
+                "forecast_unit must be one of: 'days', 'weeks', 'months'"
+            )
+        return freq_map[self.forecast_unit]
     
     def design_gam_model(self):
 
@@ -27,19 +42,24 @@ class gam_model:
         model = ph.Prophet()
         model.fit(gam_df)
 
-        future = model.make_future_dataframe(periods = self.forecast_ahead)
-        forecast = model.predict(future)
-        pred_df = forecast[['ds', 'yhat']].tail(7)
+        freq = self._get_freq()
 
+        future = model.make_future_dataframe(periods = self.forecast_ahead, freq=freq)
+        forecast = model.predict(future)
+        pred_df = forecast[['ds', 'yhat']].tail(self.forecast_ahead)
+        print(pred_df)
+
+         # diagnostics
         if self.diagnostics:
             fig = model.plot_components(forecast)
-            from prophet.plot import plot_plotly, plot_components_plotly, pl
+            from prophet.plot import plot_plotly, plot_components_plotly
             plot_plotly(model, forecast).show()
+            plot_components_plotly(model, forecast).show()
 
         return(pred_df)
     
 
 
-gm = gam_model(ts=ts, forecast_ahead=7, diagnostics=False)
+gm = gam_model(ts=ts, forecast_ahead=25, forecast_unit='weeks', diagnostics=True)
 print(gm)
 gm.design_gam_model()
