@@ -1,8 +1,8 @@
-from ..data import crypto, asset
+from garchie.data import crypto, asset
 import pandas as pd
 import numpy as np
 # select asset
-asset_series = asset(symbol='GPN', granularity='1d', start='2021-01-01', end='2024-07-11')
+asset_series = asset(symbol='VUSA.AS',granularity='1wk', start= '2020-01-01', end= '2026-01-01')
 print(asset_series)
 raw = asset_series.fetch_asset()
 raw['typical_price'] = np.round((raw['high'] + raw['low'] + raw['close']) / 3,2)
@@ -74,7 +74,7 @@ class mean_model:
         if self.stationarity:
             # stationarity -Dickey Fuller (add also kpss and decide on optimal diffs)
             # p value < 0.05 -- stationary time series
-            dftest = adfuller(ts)
+            dftest = adfuller(self.ts['typical_price'])
             print('\nResults of Dickey-Fuller Test: \n')
 
             dfoutput = pd.Series(dftest[0:4], index=['Test Statistic', 'p-value',
@@ -85,7 +85,6 @@ class mean_model:
 
         
         split_idx = round(len(ts)* self.train_size)
-
         # Split
         train, test = ts.iloc[:split_idx]['typical_price'], ts.iloc[split_idx:]['typical_price']
 
@@ -131,7 +130,7 @@ class mean_model:
             plt.show()
 
         # predict future
-        best_model = SARIMAX(ts['typical_price'],
+        best_model = SARIMAX(self.ts['typical_price'],
                             order=model.order,
                             seasonal_order=model.seasonal_order).fit()
             # best_model.summary()
@@ -160,7 +159,7 @@ class mean_model:
         return(pred_df)
 
 '''
-mm = mean_model(ts = ts,train_size= 0.96,stationarity= False,diagnostics=True)
+mm = mean_model(ts = ts,train_size= 0.8,stationarity= False,diagnostics=True)
 print(mm)
 pred_df=mm.design_mean_model()
 '''

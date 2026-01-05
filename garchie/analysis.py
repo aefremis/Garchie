@@ -1,4 +1,4 @@
-from .data import  asset, crypto
+from garchie.data import  asset, crypto
 #matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import seaborn as sns

@@ -1,9 +1,9 @@
-from ..data import crypto, asset
+from garchie.data import crypto, asset
 import pandas as pd
 import numpy as np
 import prophet as ph
 # select asset
-asset_series = asset(symbol='MSFT', granularity='1d', start='2023-01-01', end='2023-12-29')
+asset_series = asset(symbol='MSFT', granularity='1wk', start='2023-01-01', end='2025-12-29')
 print(asset_series)
 raw = asset_series.fetch_asset()
 raw['typical_price'] = np.round((raw['high'] + raw['low'] + raw['close']) / 3,2)
