@@ -86,7 +86,8 @@ class gam_model:
         Returns
         -------
         DataFrame :
-            a dataframe containing the forecasted values
+            a standardized dataframe containing the forecasted values with columns:
+            date, prediction, model_name, variable, lower_bound, upper_bound
         """
 
          # make prophet dataset
@@ -98,7 +99,22 @@ class gam_model:
 
         future = model.make_future_dataframe(periods = self.forecast_ahead, freq=freq)
         forecast = model.predict(future)
-        pred_df = forecast[['ds', 'yhat']].tail(self.forecast_ahead)
+        
+        # Standardize return structure
+        pred_df = forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(self.forecast_ahead).copy()
+        pred_df.rename(columns={
+            'ds': 'date',
+            'yhat': 'prediction',
+            'yhat_lower': 'lower_bound',
+            'yhat_upper': 'upper_bound'
+        }, inplace=True)
+        
+        pred_df['model_name'] = 'GAM'
+        pred_df['variable'] = 'price'
+        
+        # Reorder columns
+        pred_df = pred_df[['date', 'prediction', 'model_name', 'variable', 'lower_bound', 'upper_bound']]
+        
         print(pred_df)
 
          # diagnostics

@@ -116,8 +116,9 @@ class garch_model:
 
         Returns
         -------
-        conf
-        a volatility based confidence interval for any given mean prediction
+        DataFrame :
+            a standardized dataframe containing the forecasted values with columns:
+            date, prediction, model_name, variable, lower_bound, upper_bound
         """
         import numpy as np
         import arch
@@ -237,8 +238,36 @@ class garch_model:
         else:
             forecast = best_results.forecast(horizon=self.forecast_ahead).variance.T
 
-        conf = np.sqrt(forecast) * 1.96
-        return(conf)
+        # Standardize return structure
+        pred_df = pd.DataFrame()
+        # Ensure we can get a date range. 
+        # Using raw.date if available (as it is used elsewhere in this class)
+        # Assuming daily frequency if not inferable
+        last_date = raw.date.iloc[-1]
+        dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=self.forecast_ahead)
+        
+        pred_df['date'] = dates
+        # forecast is variance. prediction = sqrt(variance) = volatility
+        # forecast is a dataframe with columns h.1, h.2... or rows if T. 
+        # Code above: forecast = ... .variance.T
+        # if horizon=forecast_ahead, forecast has shape (forecast_ahead, 1) or similar?
+        # forecast object from arch: .variance returns DataFrame. 
+        # .forecast(horizon=h).variance -> columns h.1, h.2, ... h.h. Rows: 1 (if from end).
+        # .variance.T -> rows h.1, h.2.
+        
+        # We need to extract the values correctly.
+        # Assuming forecast is a DataFrame (transposed) with 1 column (the forecast origin).
+        # We take the values.
+        
+        volatility = np.sqrt(forecast.values.flatten())
+        
+        pred_df['prediction'] = volatility
+        pred_df['model_name'] = 'GARCH'
+        pred_df['variable'] = 'volatility'
+        pred_df['lower_bound'] = np.nan
+        pred_df['upper_bound'] = np.nan
+        
+        return(pred_df)
 
 
 # sample run

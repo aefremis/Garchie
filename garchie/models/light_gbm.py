@@ -104,7 +104,8 @@ class lgbm:
         Returns
         -------
         forecast_df :
-        an array with forecasts
+        a standardized dataframe containing the forecasted values with columns:
+        date, prediction, model_name, variable, lower_bound, upper_bound
         """
         import statsmodels.api as sm
         import lightgbm as gbm
@@ -202,11 +203,11 @@ class lgbm:
 
         #to forecast ahead - build lagged process
         start_date = ts.index.max() + timedelta(days=1)
-        new_index_range = pd.date_range(start_date,periods=7)
+        new_index_range = pd.date_range(start_date,periods=self.forecast_ahead)
 
         column_info = [(col, str(dt)) for col, dt in zip(ts.columns, ts.dtypes)]
         forecast_df = pd.DataFrame(columns=[col for col, _ in column_info])
-        forecast_df['typical_price']=np.repeat(np.NaN,7,axis=0)
+        forecast_df['typical_price']=np.repeat(np.NaN,self.forecast_ahead,axis=0)
         forecast_df.set_index(new_index_range, inplace=True)
 
         forecast_df.reset_index(inplace=True)
@@ -220,7 +221,7 @@ class lgbm:
             forecast_df.loc[forecast_df.index[0], [f'lag_{i}' for i in lag_sequence]] = y.tail(significant_count).values
 
             # add lags to forecast df
-            for pred_step in np.arange(7):
+            for pred_step in np.arange(self.forecast_ahead):
                 temp_newdata = forecast_df.loc[[forecast_df.index[pred_step]], ~forecast_df.columns.isin(['typical_price'])]
                 temp_newdata[[f'lag_{i}' for i in lag_sequence]] = temp_newdata[[f'lag_{i}' for i in lag_sequence]].astype(float)
 
@@ -228,7 +229,7 @@ class lgbm:
                 prediction_step = best_model.predict(temp_newdata)
                 forecast_df.at[forecast_df.index[pred_step], 'typical_price'] = prediction_step[0].round(2)
                 
-                if pred_step < max(np.arange(7)):
+                if pred_step < max(np.arange(self.forecast_ahead)):
                     forecast_df.at[forecast_df.index[pred_step + 1], 'lag_1'] = prediction_step[0].round(2)
 
                     if len(lag_sequence) > 1:
@@ -257,7 +258,15 @@ class lgbm:
             fig.tight_layout()
             plt.show()
 
-        return(forecast_df)
+        # Standardize return structure
+        result_df = forecast_df[['date', 'typical_price']].copy()
+        result_df.rename(columns={'typical_price': 'prediction'}, inplace=True)
+        result_df['model_name'] = 'LightGBM'
+        result_df['variable'] = 'price'
+        result_df['lower_bound'] = np.nan
+        result_df['upper_bound'] = np.nan
+        
+        return(result_df)
 
 
 '''

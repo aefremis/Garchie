@@ -30,7 +30,7 @@ class mean_model:
         design_mean_model()
             Designs the optimal AutoRegressive model for a given time-series
         """
-    def __init__(self, ts, train_size, stationarity, diagnostics):
+    def __init__(self, ts, train_size, forecast_ahead, stationarity, diagnostics):
         """
         Parameters
        ----------
@@ -38,6 +38,8 @@ class mean_model:
             a dataframe that contains the asset information
         train_size : float
             a number that points to the size of the training set from 0 to 1 (default = 0.8)
+        forecast_ahead : integer
+            number of periods to forecast
         stationarity : bool
             a boolean that prints the stationarity tests
         diagnostics : bool
@@ -45,6 +47,7 @@ class mean_model:
         """
         self.ts = ts
         self.train_size = train_size
+        self.forecast_ahead = forecast_ahead
         self.stationarity = stationarity
         self.diagnostics = diagnostics
 
@@ -61,8 +64,9 @@ class mean_model:
 
         Returns
         -------
-        best_model
-            a statsmodels.tsa.statespace.sarimax.SARIMAXResultsWrapper model
+        DataFrame :
+            a standardized dataframe containing the forecasted values with columns:
+            date, prediction, model_name, variable, lower_bound, upper_bound
         """
         import pmdarima
         from statsmodels.tsa.stattools import adfuller
@@ -84,9 +88,9 @@ class mean_model:
             print(dfoutput)
 
         
-        split_idx = round(len(ts)* self.train_size)
+        split_idx = round(len(self.ts)* self.train_size)
         # Split
-        train, test = ts.iloc[:split_idx]['typical_price'], ts.iloc[split_idx:]['typical_price']
+        train, test = self.ts.iloc[:split_idx]['typical_price'], self.ts.iloc[split_idx:]['typical_price']
 
         # Visualize split
         if self.diagnostics:
@@ -139,18 +143,33 @@ class mean_model:
             plt.show()
             # best_model.fittedvalues
 
-        forecast = best_model.get_forecast(steps=7)
+        forecast = best_model.get_forecast(steps=self.forecast_ahead)
         pred_df = forecast.conf_int()
-        pred_df['pred'] = forecast.predicted_mean
-        pred_df.columns = ['lower', 'upper', 'pred']
+        pred_df['prediction'] = forecast.predicted_mean
+        pred_df.columns = ['lower_bound', 'upper_bound', 'prediction']
+        
+        # Standardize return structure
+        pred_df.reset_index(inplace=True)
+        pred_df.rename(columns={'index': 'date'}, inplace=True)
+        
+        # Ensure date column exists and is correct. 
+        # SARIMAX forecast should return a DatetimeIndex if the input series has it.
+        # But in case it returns an integer index (if freq was missing), we might need to handle it.
+        # Assuming the input 'ts' has a datetime index (based on other files usage).
+        
+        pred_df['model_name'] = 'ARIMA'
+        pred_df['variable'] = 'price'
+        
+        # Reorder columns
+        pred_df = pred_df[['date', 'prediction', 'model_name', 'variable', 'lower_bound', 'upper_bound']]
 
         if self.diagnostics:
             fig, ax = plt.subplots(figsize=(12, 7))
             ax.plot(train, label='Train', marker='.')
             ax.plot(test, label='Test', marker='.')
-            ax.plot(pred_df['pred'], label='Prediction', ls='--', linewidth=3)
+            ax.plot(pred_df['prediction'], label='Prediction', ls='--', linewidth=3)
 
-            ax.fill_between(x=pred_df.index, y1=pred_df['lower'], y2=pred_df['upper'], alpha=0.3)
+            ax.fill_between(x=pred_df['date'], y1=pred_df['lower_bound'], y2=pred_df['upper_bound'], alpha=0.3)
             ax.set_title('Model Predictions', fontsize=22)
             ax.legend(loc='upper left')
             fig.tight_layout()
