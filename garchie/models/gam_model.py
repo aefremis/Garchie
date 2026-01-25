@@ -11,8 +11,40 @@ ts = raw[['date', 'typical_price']].copy()
 
 
 class gam_model:
+    """
+    A class used to represent the Generalized Additive Model (GAM) using Prophet for time series forecasting.
+
+    ...
+    Attributes
+    ----------
+    ts : dataframe
+        a dataframe that contains the asset information (dates and prices)
+    forecast_ahead : integer
+        a number that dictates the forecasting horizon
+    forecast_unit : string
+        the unit of time for forecasting ('days', 'weeks', 'months')
+    diagnostics : bool
+        a boolean that enables diagnostic plotting
+
+    Methods
+    -------
+    design_gam_model()
+        Designs the GAM model using Prophet and generates forecasts
+    """
 
     def __init__(self, ts, forecast_ahead, forecast_unit, diagnostics=True):
+        """
+        Parameters
+        ----------
+        ts : dataframe
+            a dataframe that contains the asset information (dates and prices)
+        forecast_ahead : integer
+            a number that dictates the forecasting horizon
+        forecast_unit : string
+            the unit of time for forecasting ('days', 'weeks', 'months')
+        diagnostics : bool
+            a boolean that enables diagnostic plotting
+        """
         self.ts = ts
         self.forecast_ahead = forecast_ahead
         self.forecast_unit = forecast_unit.lower()
@@ -24,6 +56,14 @@ class gam_model:
 
        
     def _get_freq(self):
+        """
+        Maps the forecast unit to a pandas frequency string.
+
+        Returns
+        -------
+        string :
+            pandas frequency alias ('D', 'W', 'MS')
+        """
         freq_map = {
             "days": "D",
             "weeks": "W",
@@ -36,6 +76,18 @@ class gam_model:
         return freq_map[self.forecast_unit]
     
     def design_gam_model(self):
+        """
+        Designs the GAM model using Prophet and generates forecasts.
+
+        Parameters
+        ----------
+        self : an object of class gam_model
+
+        Returns
+        -------
+        DataFrame :
+            a dataframe containing the forecasted values
+        """
 
          # make prophet dataset
         gam_df = self.ts.rename(columns={'date':'ds','typical_price':'y'})
@@ -59,7 +111,8 @@ class gam_model:
         return(pred_df)
     
 
-
+'''
 gm = gam_model(ts=ts, forecast_ahead=25, forecast_unit='weeks', diagnostics=True)
 print(gm)
 gm.design_gam_model()
+'''

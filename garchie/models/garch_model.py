@@ -1,7 +1,7 @@
-from ..data import crypto, asset
+from garchie.data import crypto, asset
 import pandas as pd
 # select asset
-asset_series = asset(symbol='IBM', granularity='1d', start='2023-01-01', end='2023-12-29')
+asset_series = asset(symbol='VUSA.AS',granularity='1wk', start= '2020-01-01', end= '2026-01-01')
 print(asset_series)
 raw = asset_series.fetch_asset()
 raw.reset_index(inplace=True)
@@ -243,7 +243,7 @@ class garch_model:
 
 # sample run
 '''
-gg = garch_model(ts=ts, forecast_ahead=7, fixed_window=False, diagnostics=False)
+gg = garch_model(ts=ts, forecast_ahead=7, fixed_window=False, diagnostics=True
 print(gg)
 gg.design_garch_model()
 '''
