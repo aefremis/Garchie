@@ -1,8 +1,8 @@
-from ..data import crypto, asset
+from garchie.data import crypto, asset
 import pandas as pd
 import numpy as np
 # select asset
-asset_series = asset(symbol='GPN', granularity='1d', start='2021-01-01', end='2024-07-11')
+asset_series = asset(symbol='MSFT', granularity='1wk', start='2021-01-01', end='2025-12-29')
 print(asset_series)
 raw = asset_series.fetch_asset()
 raw['typical_price'] = np.round((raw['high'] + raw['low'] + raw['close']) / 3,2)
@@ -207,7 +207,7 @@ class lgbm:
 
         column_info = [(col, str(dt)) for col, dt in zip(ts.columns, ts.dtypes)]
         forecast_df = pd.DataFrame(columns=[col for col, _ in column_info])
-        forecast_df['typical_price']=np.repeat(np.NaN,self.forecast_ahead,axis=0)
+        forecast_df['typical_price']=np.repeat(np.nan,self.forecast_ahead,axis=0)
         forecast_df.set_index(new_index_range, inplace=True)
 
         forecast_df.reset_index(inplace=True)
@@ -259,6 +259,7 @@ class lgbm:
             plt.show()
 
         # Standardize return structure
+        forecast_df.reset_index(inplace=True)   
         result_df = forecast_df[['date', 'typical_price']].copy()
         result_df.rename(columns={'typical_price': 'prediction'}, inplace=True)
         result_df['model_name'] = 'LightGBM'
