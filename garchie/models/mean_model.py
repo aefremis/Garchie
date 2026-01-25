@@ -178,7 +178,7 @@ class mean_model:
         return(pred_df)
 
 '''
-mm = mean_model(ts = ts,train_size= 0.8,stationarity= False,diagnostics=True)
+mm = mean_model(ts = ts,train_size= 0.8,forecast_ahead=10,stationarity= False,diagnostics=False)
 print(mm)
 pred_df=mm.design_mean_model()
 '''

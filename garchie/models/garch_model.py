@@ -127,9 +127,9 @@ class garch_model:
         import sys
 
         # Define the parameter grid
-        p_values = range(1, 4)
-        q_values = range(3)
-        o_values = range(1)
+        p_values = range(1, 2)
+        q_values = [1]
+        o_values = range(2)
         mean_type_values = ['constant', 'zero', 'AR']
         distribution_values = ['normal', 'skewt', 't']
         vol_values = ['GARCH', 'EGARCH']
@@ -272,7 +272,7 @@ class garch_model:
 
 # sample run
 '''
-gg = garch_model(ts=ts, forecast_ahead=7, fixed_window=False, diagnostics=True
+gg = garch_model(ts=ts, forecast_ahead=7, fixed_window=False, diagnostics=True)
 print(gg)
 gg.design_garch_model()
 '''
