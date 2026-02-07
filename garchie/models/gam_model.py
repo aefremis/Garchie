@@ -2,12 +2,14 @@ from garchie.data import crypto, asset
 import pandas as pd
 import numpy as np
 import prophet as ph
-# select asset
-asset_series = asset(symbol='MSFT', granularity='1wk', start='2023-01-01', end='2025-12-29')
-print(asset_series)
-raw = asset_series.fetch_asset()
-raw['typical_price'] = np.round((raw['high'] + raw['low'] + raw['close']) / 3,2)
-ts = raw[['date', 'typical_price']].copy()
+
+if __name__ == "__main__":
+    # select asset
+    asset_series = asset(symbol='MSFT', granularity='1wk', start='2023-01-01', end='2025-12-29')
+    print(asset_series)
+    raw = asset_series.fetch_asset()
+    raw['typical_price'] = np.round((raw['high'] + raw['low'] + raw['close']) / 3,2)
+    ts = raw[['date', 'typical_price']].copy()
 
 
 class gam_model:
