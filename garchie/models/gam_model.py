@@ -3,15 +3,6 @@ import pandas as pd
 import numpy as np
 import prophet as ph
 
-if __name__ == "__main__":
-    # select asset
-    asset_series = asset(symbol='MSFT', granularity='1wk', start='2023-01-01', end='2025-12-29')
-    print(asset_series)
-    raw = asset_series.fetch_asset()
-    raw['typical_price'] = np.round((raw['high'] + raw['low'] + raw['close']) / 3,2)
-    ts = raw[['date', 'typical_price']].copy()
-
-
 class gam_model:
     """
     A class used to represent the Generalized Additive Model (GAM) using Prophet for time series forecasting.
@@ -53,7 +44,7 @@ class gam_model:
         self.diagnostics = diagnostics 
 
     def __str__(self):
-        return f"class of gam model"
+        return f"GAM Model (Forecast: {self.forecast_ahead} {self.forecast_unit})"
     
 
        
@@ -129,8 +120,14 @@ class gam_model:
         return(pred_df)
     
 
-'''
-gm = gam_model(ts=ts, forecast_ahead=25, forecast_unit='weeks', diagnostics=True)
-print(gm)
-gm.design_gam_model()
-'''
+if __name__ == "__main__":
+    # select asset
+    asset_series = asset(symbol='MSFT', granularity='1wk', start='2023-01-01', end='2025-12-29')
+    print(asset_series)
+    raw = asset_series.fetch_asset()
+    raw['typical_price'] = np.round((raw['high'] + raw['low'] + raw['close']) / 3, 2)
+    ts = raw[['date', 'typical_price']].copy()
+
+    gm = gam_model(ts=ts, forecast_ahead=25, forecast_unit='weeks', diagnostics=True)
+    print(gm)
+    gm.design_gam_model()
