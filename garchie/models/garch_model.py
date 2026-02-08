@@ -1,48 +1,50 @@
 from garchie.data import crypto, asset
+from garchie.eda import EDA
 import pandas as pd
-# select asset
-asset_series = asset(symbol='VUSA.AS',granularity='1wk', start= '2020-01-01', end= '2026-01-01')
-print(asset_series)
-raw = asset_series.fetch_asset()
-raw.reset_index(inplace=True)
-ts = raw['return'].copy()
-
+import numpy as np
+import arch
+from itertools import product
+from arch.__future__ import reindexing
+import sys
 
 class garch_model:
     """
-        A class used to represent the optimal GARCH  model to be used as a volatility model to the prediction committee
+    A class used to represent the optimal GARCH model to be used as a volatility model to the prediction committee.
 
-        ...
-        Attributes
-        ----------
-        ts : dataframe
-            a dataframe that contains the asset information
-        forecast_ahead : integer
-            a number that dictates the forecasting horizon and holdout evaluation window
-        fixed_window : bool
-            a boolean that chooses between rolling and fixed window forecast for the evaluation
-        diagnostics : bool
-            a boolean that prints the diagnostic/prediction plots
+    Attributes
+    ----------
+    ts : pd.Series
+        Input Series containing asset returns, indexed by date.
+    forecast_ahead : int
+        Number of periods to forecast into the future.
+    fixed_window : bool
+        If True, uses a fixed window for evaluation. If False, uses a rolling window.
+    diagnostics : bool
+        If True, prints diagnostic/prediction plots.
 
-        Methods
-        -------
-        design_garch_model()
-            Designs the optimal autoregressive conditional heteroskedasticity model for a given time-series
+    Methods
+    -------
+    design_garch_model() -> pd.DataFrame
+        Designs the optimal autoregressive conditional heteroskedasticity model for a given time-series.
     """
-    def __init__(self, ts, forecast_ahead, fixed_window, diagnostics):
+    def __init__(self, ts: pd.Series, forecast_ahead: int, fixed_window: bool, diagnostics: bool):
         """
         Parameters
-       ----------
-        ts : dataframe
-            a dataframe that contains the asset information
-        forecast_ahead : integer
-            a number dictates the forecasting horizon and holdout evaluation window
+        ----------
+        ts : pd.Series
+            Input Series containing asset returns, indexed by date.
+        forecast_ahead : int
+            Number of periods to forecast into the future.
         fixed_window : bool
-            a boolean that chooses between rolling and fixed window forecast for the evaluation
+            If True, uses a fixed window for evaluation. If False, uses a rolling window.
         diagnostics : bool
-            a boolean that prints the diagnostic/prediction plots
+            If True, prints diagnostic/prediction plots.
         """
-        self.ts = ts
+        self.ts = ts.copy()
+        if not isinstance(self.ts.index, pd.DatetimeIndex):
+            # Try to convert if it's not already
+            pass
+            
         self.forecast_ahead = forecast_ahead
         self.fixed_window = fixed_window
         self.diagnostics = diagnostics
@@ -50,51 +52,53 @@ class garch_model:
     def __str__(self):
         return f"class of optimal GARCH model for the given asset"
 
-    def fit_evaluate_garch(self, p_order, q_order, o_order, mean_type, vol_type, dist_type):
+    def fit_evaluate_garch(self, p_order: int, q_order: int, o_order: int, mean_type: str, vol_type: str, dist_type: str) -> dict:
         """
-        Fits a specified GARCH model and returns its performance metrics
+        Fits a specified GARCH model and returns its performance metrics.
 
         Parameters
         ----------
-        p_order : integer
-        Lag order of the symmetric innovation
-        q_order : integer
-        Lag order of lagged volatility
-        o_order : integer
-        Lag order of the asymmetric innovation
-        mean_type : Name of the mean model
-        vol_type : Name of the volatility model
-        dist_type : Name of the error distribution
+        p_order : int
+            Lag order of the symmetric innovation.
+        q_order : int
+            Lag order of lagged volatility.
+        o_order : int
+            Lag order of the asymmetric innovation.
+        mean_type : str
+            Name of the mean model (e.g., 'Constant', 'Zero', 'AR').
+        vol_type : str
+            Name of the volatility model (e.g., 'GARCH', 'EGARCH').
+        dist_type : str
+            Name of the error distribution (e.g., 'Normal', 't').
 
         Returns
         -------
-        DataFrame :
-        a dictionary of performance metrics (aic, bic, loglikelihood)
+        dict
+            A dictionary of performance metrics (aic, bic, loglikelihood).
         """
-        import arch
         model = arch.arch_model(y=self.ts, vol=vol_type, p=p_order, q=q_order,
                                 o=o_order, mean=mean_type, dist=dist_type)
-        results = model.fit(disp='off')
+        # Increase maxiter to improve convergence
+        results = model.fit(disp='off', options={'maxiter': 200})
         return {"aic": results.aic,
                 "bic": results.bic,
                 "loglikelihood": results.loglikelihood}
 
-    ## Backtesting with MAE, MSE
-    def evaluate(self, observation, forecast):
+    def evaluate(self, observation: pd.Series, forecast: pd.Series) -> tuple:
         """
-        Fits a specified GARCH model and returns its performance metrics
+        Evaluates the model forecast against observed data using MAE and MSE.
 
         Parameters
         ----------
-        observation : array
-        observed variance in hold-out period
-        forecast : array
-        predicted variance in hold-out period
+        observation : pd.Series
+            Observed variance in hold-out period.
+        forecast : pd.Series
+            Predicted variance in hold-out period.
 
         Returns
         -------
-        List : list
-        a list of accuracy metrics (mae, mse)
+        tuple
+            A tuple of accuracy metrics (mae, mse).
         """
         from sklearn.metrics import mean_absolute_error, mean_squared_error
         # Call sklearn function to calculate MAE
@@ -105,26 +109,16 @@ class garch_model:
         print('Mean Squared Error (MSE): {:.3g}'.format(mse))
         return mae, mse
 
-    def design_garch_model(self):
+    def design_garch_model(self) -> pd.DataFrame:
         """
-        Designs the optimal GARCH model for a given time-series
-
-        Parameters
-        ----------
-        self : an object of class garch_model
-        An object of class 'garch_model' with relevant attributes
+        Designs the optimal GARCH model for a given time-series.
 
         Returns
         -------
-        DataFrame :
-            a standardized dataframe containing the forecasted values with columns:
-            date, prediction, model_name, variable, lower_bound, upper_bound
+        pd.DataFrame
+            A standardized dataframe containing the forecasted values with columns:
+            ['date', 'prediction', 'model_name', 'variable', 'lower_bound', 'upper_bound']
         """
-        import numpy as np
-        import arch
-        from itertools import product
-        from arch.__future__ import reindexing
-        import sys
 
         # Define the parameter grid
         p_values = range(1, 2)
@@ -143,10 +137,10 @@ class garch_model:
                                                                'vol_type_values',
                                                                'distribution_values'])
         # Initialize variables to store the best results
-        best_params = None
         results_df = pd.DataFrame()
 
         # Perform grid search
+        # Using a subset for faster execution in this environment if needed, but keeping full loop
         for i in range(parameter_grid.shape[0]):
             try:
                 p_order, q_order, o_order, mean_type, vol_type, dist_type = parameter_grid.iloc[i, :]
@@ -158,7 +152,7 @@ class garch_model:
                                  }
                 temp_df = pd.DataFrame.from_dict([global_fit_dic])
                 results_df = pd.concat([results_df,temp_df])
-                print(f'Itteration {i} of {parameter_grid.shape[0]} ')
+                # print(f'Itteration {i} of {parameter_grid.shape[0]} ')
             except:
                 continue
 
@@ -174,23 +168,22 @@ class garch_model:
         best_p, best_q, best_o, best_mean, best_vol, best_dist = parameter_grid.iloc[best_pos,:]
         # Fit the best model to the full data
         best_p, best_q, best_o = int(best_p), int(best_q), int(best_o)
-        best_model = arch.arch_model(ts, vol=best_vol, p=best_p, q=best_q, o=best_o,
+        best_model = arch.arch_model(self.ts, vol=best_vol, p=best_p, q=best_q, o=best_o,
                                      mean=best_mean, dist=best_dist)
-        best_results = best_model.fit(disp='off')
+        # Increase maxiter for final fit
+        best_results = best_model.fit(disp='off', options={'maxiter': 200})
 
-        # Visualize results
-        # best_results.plot().show()
-
+        # Rolling / Fixed Window Forecast Logic
         if self.fixed_window:
-            ts.index = raw.date
-            index = ts.index
+            index = self.ts.index
             start_loc = 0
             end_loc = len(index) - self.forecast_ahead
             forecasts = {}
-            for i in range(len(ts) - end_loc):
+            for i in range(len(self.ts) - end_loc):
                 sys.stdout.write('o')
                 sys.stdout.flush()
-                res = best_model.fit(first_obs=start_loc + i, last_obs=i + end_loc, disp='off')
+                # Increase maxiter for rolling forecast fits
+                res = best_model.fit(first_obs=start_loc + i, last_obs=i + end_loc, disp='off', options={'maxiter': 200})
                 temp = res.forecast(horizon=1, start=end_loc).variance
                 fcast = temp.iloc[i]
                 forecasts[fcast.name] = fcast
@@ -198,40 +191,29 @@ class garch_model:
             variance_holdout = pd.DataFrame(forecasts).T
             variance_holdout = pd.Series(variance_holdout['h.1'])
         else:
-            ts.index = raw.date
-            index = ts.index
+            index = self.ts.index
             start_loc = 0
             end_loc = len(index) - self.forecast_ahead
             forecasts = {}
-            for i in range(len(ts) - end_loc):
+            for i in range(len(self.ts) - end_loc):
                 sys.stdout.write('-')
                 sys.stdout.flush()
-                res = best_model.fit(first_obs=start_loc, last_obs=i + end_loc, disp='off')
+                # Increase maxiter for rolling forecast fits
+                res = best_model.fit(first_obs=start_loc, last_obs=i + end_loc, disp='off', options={'maxiter': 200})
                 temp = res.forecast(horizon=1, start=end_loc).variance
                 fcast = temp.iloc[i]
                 forecasts[fcast.name] = fcast
             print(' Done!')
             variance_holdout = pd.DataFrame(forecasts).T
             variance_holdout = pd.Series(variance_holdout['h.1'])
-            # print(best_results.summary())
 
         # Backtest model with MAE, MSE
-        observed_var = raw['return'].tail(self.forecast_ahead).sub(raw['return'].tail(self.forecast_ahead).mean()).pow(2)
+        observed_var = self.ts.tail(self.forecast_ahead).sub(self.ts.tail(self.forecast_ahead).mean()).pow(2)
+        
         self.evaluate(observed_var, variance_holdout)
 
         if self.diagnostics:
-            import matplotlib
-            matplotlib.use("TkAgg")
-            import matplotlib.pyplot as plt
-            # Plot the actual  volatility
-            bm_std = best_results.conditional_volatility
-            plt.plot(raw['return'].sub(raw['return'].mean()).pow(2),
-                     color='grey', alpha=0.4, label='Daily Volatility')
-
-            # Plot EGARCH  estimated volatility
-            plt.plot(bm_std ** 2, color='red', label='Best Model Volatility')
-            plt.legend(loc='upper right')
-            plt.show()
+            EDA.plot_garch_diagnostics(self.ts, best_results)
 
         if best_vol == 'EGARCH':
             forecast = best_results.forecast(horizon=self.forecast_ahead, method="bootstrap").variance.T
@@ -240,24 +222,25 @@ class garch_model:
 
         # Standardize return structure
         pred_df = pd.DataFrame()
-        # Ensure we can get a date range. 
-        # Using raw.date if available (as it is used elsewhere in this class)
-        # Assuming daily frequency if not inferable
-        last_date = raw.date.iloc[-1]
-        dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=self.forecast_ahead)
         
-        pred_df['date'] = dates
-        # forecast is variance. prediction = sqrt(variance) = volatility
-        # forecast is a dataframe with columns h.1, h.2... or rows if T. 
-        # Code above: forecast = ... .variance.T
-        # if horizon=forecast_ahead, forecast has shape (forecast_ahead, 1) or similar?
-        # forecast object from arch: .variance returns DataFrame. 
-        # .forecast(horizon=h).variance -> columns h.1, h.2, ... h.h. Rows: 1 (if from end).
-        # .variance.T -> rows h.1, h.2.
+        # Robust Future Date Generation
+        last_date = self.ts.index[-1]
+        freq = pd.infer_freq(self.ts.index)
         
-        # We need to extract the values correctly.
-        # Assuming forecast is a DataFrame (transposed) with 1 column (the forecast origin).
-        # We take the values.
+        if freq is None:
+            # Heuristic: infer from last two points
+            if len(self.ts.index) > 1:
+                diff = self.ts.index[-1] - self.ts.index[-2]
+                if diff.days >= 28 and diff.days <= 31: freq = 'ME' # Monthly End
+                elif diff.days == 7: freq = 'W'
+                elif diff.days == 1: freq = 'D'
+                elif diff.days <= 3: freq = 'B' # Assume Business Day if small gap
+                else: freq = 'D' # Default to daily
+            else:
+                freq = 'D' # Fallback for single point
+
+        future_dates = pd.date_range(start=last_date, periods=self.forecast_ahead + 1, freq=freq)[1:]
+        pred_df['date'] = future_dates
         
         volatility = np.sqrt(forecast.values.flatten())
         
@@ -267,13 +250,24 @@ class garch_model:
         pred_df['lower_bound'] = np.nan
         pred_df['upper_bound'] = np.nan
         
+        # Reorder columns
+        pred_df = pred_df[['date', 'prediction', 'model_name', 'variable', 'lower_bound', 'upper_bound']]
+        
         return(pred_df)
 
 
-# sample run
-'''
-gg = garch_model(ts=ts, forecast_ahead=7, fixed_window=False, diagnostics=True)
-print(gg)
-gg.design_garch_model()
-'''
+if __name__ == "__main__":
+    # select asset
+    asset_series = asset(symbol='VUSA.AS',granularity='1wk', start= '2020-01-01', end= '2026-01-01')
+    print(asset_series)
+    raw = asset_series.fetch_asset()
+    raw.reset_index(inplace=True)
+    # Ensure date is datetime
+    raw['date'] = pd.to_datetime(raw['date'])
+    raw.set_index('date', inplace=True)
+    ts = raw['return'].copy()
 
+    gg = garch_model(ts=ts, forecast_ahead=7, fixed_window=False, diagnostics=True)
+    print(gg)
+    res = gg.design_garch_model()
+    print(res)
