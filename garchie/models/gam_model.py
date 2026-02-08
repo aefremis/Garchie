@@ -1,42 +1,42 @@
-from garchie.data import crypto, asset
+from garchie.data import crypto, asset, commodity
 import pandas as pd
 import numpy as np
 import prophet as ph
+from garchie.eda import EDA
 
 class gam_model:
     """
-    A class used to represent the Generalized Additive Model (GAM) using Prophet for time series forecasting.
+    Implements a Generalized Additive Model (GAM) using Prophet for time series forecasting.
 
-    ...
     Attributes
     ----------
-    ts : dataframe
-        a dataframe that contains the asset information (dates and prices)
-    forecast_ahead : integer
-        a number that dictates the forecasting horizon
-    forecast_unit : string
-        the unit of time for forecasting ('days', 'weeks', 'months')
+    ts : pd.DataFrame
+        Input DataFrame containing 'date' and 'typical_price' columns.
+    forecast_ahead : int
+        Number of steps to forecast into the future.
+    forecast_unit : str
+        Time unit for forecasting ('days', 'weeks', 'months').
     diagnostics : bool
-        a boolean that enables diagnostic plotting
+        If True, displays diagnostic plots during execution.
 
     Methods
     -------
     design_gam_model()
-        Designs the GAM model using Prophet and generates forecasts
+        Fits the GAM model using Prophet and generates forecasts.
     """
 
-    def __init__(self, ts, forecast_ahead, forecast_unit, diagnostics=True):
+    def __init__(self, ts: pd.DataFrame, forecast_ahead: int, forecast_unit: str, diagnostics: bool = True):
         """
         Parameters
         ----------
-        ts : dataframe
-            a dataframe that contains the asset information (dates and prices)
-        forecast_ahead : integer
-            a number that dictates the forecasting horizon
-        forecast_unit : string
-            the unit of time for forecasting ('days', 'weeks', 'months')
+        ts : pd.DataFrame
+            Input DataFrame containing 'date' and 'typical_price' columns.
+        forecast_ahead : int
+            Number of steps to forecast into the future.
+        forecast_unit : str
+            Time unit for forecasting ('days', 'weeks', 'months').
         diagnostics : bool
-            a boolean that enables diagnostic plotting
+            If True, displays diagnostic plots during execution.
         """
         self.ts = ts
         self.forecast_ahead = forecast_ahead
@@ -48,14 +48,14 @@ class gam_model:
     
 
        
-    def _get_freq(self):
+    def _get_freq(self) -> str:
         """
         Maps the forecast unit to a pandas frequency string.
 
         Returns
         -------
-        string :
-            pandas frequency alias ('D', 'W', 'MS')
+        str
+            Pandas frequency alias ('D', 'W', 'MS').
         """
         freq_map = {
             "days": "D",
@@ -68,19 +68,15 @@ class gam_model:
             )
         return freq_map[self.forecast_unit]
     
-    def design_gam_model(self):
+    def design_gam_model(self) -> pd.DataFrame:
         """
-        Designs the GAM model using Prophet and generates forecasts.
-
-        Parameters
-        ----------
-        self : an object of class gam_model
+        Fits the GAM model using Prophet and generates forecasts.
 
         Returns
         -------
-        DataFrame :
-            a standardized dataframe containing the forecasted values with columns:
-            date, prediction, model_name, variable, lower_bound, upper_bound
+        pd.DataFrame
+            Standardized forecast DataFrame with columns:
+            ['date', 'prediction', 'model_name', 'variable', 'lower_bound', 'upper_bound']
         """
 
          # make prophet dataset
@@ -108,16 +104,11 @@ class gam_model:
         # Reorder columns
         pred_df = pred_df[['date', 'prediction', 'model_name', 'variable', 'lower_bound', 'upper_bound']]
         
-        print(pred_df)
-
-         # diagnostics
+        # diagnostics
         if self.diagnostics:
-            fig = model.plot_components(forecast)
-            from prophet.plot import plot_plotly, plot_components_plotly
-            plot_plotly(model, forecast).show()
-            plot_components_plotly(model, forecast).show()
+            EDA.plot_gam_diagnostics(model, forecast)
 
-        return(pred_df)
+        return pred_df
     
 
 if __name__ == "__main__":
@@ -130,4 +121,5 @@ if __name__ == "__main__":
 
     gm = gam_model(ts=ts, forecast_ahead=25, forecast_unit='weeks', diagnostics=True)
     print(gm)
-    gm.design_gam_model()
+    forecast_results = gm.design_gam_model()
+    print(forecast_results)
