@@ -216,7 +216,12 @@ class garch_model:
             EDA.plot_garch_diagnostics(self.ts, best_results)
 
         if best_vol == 'EGARCH':
-            forecast = best_results.forecast(horizon=self.forecast_ahead, method="bootstrap").variance.T
+            try:
+                forecast = best_results.forecast(horizon=self.forecast_ahead, method="bootstrap").variance.T
+            except ValueError:
+                # Fallback to simulation if dataset is too small for bootstrap (< 100 obs)
+                print("Warning: Bootstrap forecast failed (likely insufficient data). Falling back to simulation.")
+                forecast = best_results.forecast(horizon=self.forecast_ahead, method="simulation").variance.T
         else:
             forecast = best_results.forecast(horizon=self.forecast_ahead).variance.T
 
