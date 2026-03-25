@@ -406,6 +406,7 @@ class EDA:
         """
         w_gam = weights.get('gam', 0)
         w_mean = weights.get('mean', 0)
+        w_theta = weights.get('theta', 0)
         
         plt.figure(figsize=(14, 8))
         
@@ -428,6 +429,8 @@ class EDA:
             plt.plot(val_dates, validation_df['gam_pred'], label='GAM Validation', color='blue', linestyle=':', linewidth=2, alpha=0.7)
         if 'mean_pred' in validation_df.columns:
             plt.plot(val_dates, validation_df['mean_pred'], label='Mean Model Validation', color='red', linestyle=':', linewidth=2, alpha=0.7)
+        if 'theta_pred' in validation_df.columns:
+            plt.plot(val_dates, validation_df['theta_pred'], label='Theta Model Validation', color='green', linestyle=':', linewidth=2, alpha=0.7)
         
         # Plot Weighted Validation Forecast
         if 'weighted_forecast' in validation_df.columns:
@@ -448,6 +451,8 @@ class EDA:
             plt.plot(fut_dates, future_df['gam_pred'], label=f'GAM Forecast (Weight: {w_gam:.2f})', color='blue', linestyle='--', alpha=0.5)
         if 'mean_pred' in future_df.columns:
             plt.plot(fut_dates, future_df['mean_pred'], label=f'Mean Model Forecast (Weight: {w_mean:.2f})', color='red', linestyle='--', alpha=0.5)
+        if 'theta_pred' in future_df.columns:
+            plt.plot(fut_dates, future_df['theta_pred'], label=f'Theta Model Forecast (Weight: {w_theta:.2f})', color='green', linestyle='--', alpha=0.5)
         
         if 'weighted_forecast' in future_df.columns:
             plt.plot(fut_dates, future_df['weighted_forecast'], label='Combined Forecast', color='black', linewidth=2.5)
