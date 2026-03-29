@@ -411,20 +411,15 @@ class EDA:
         plt.figure(figsize=(14, 8))
         
         # 1. Plot Full History (Actuals) from self.df
-        # Assuming 'typical_price' or 'close' is the target. Using 'close' as standard, 
-        # but weighted_forecast uses 'typical_price'. We will check if typical_price exists, else close.
         col_to_plot = 'typical_price' if 'typical_price' in self.df.columns else 'close'
-        
         plt.plot(self.df.index, self.df[col_to_plot], label='Actual History', color='gray', alpha=0.6, linewidth=1.5)
         
         # 2. Plot Validation Predictions (Backtest)
-        # Ensure validation_df has 'date' column or index
         if 'date' in validation_df.columns:
             val_dates = pd.to_datetime(validation_df['date'])
         else:
             val_dates = validation_df.index
 
-        # Plot individual model validation predictions if available
         if 'gam_pred' in validation_df.columns:
             plt.plot(val_dates, validation_df['gam_pred'], label='GAM Validation', color='blue', linestyle=':', linewidth=2, alpha=0.7)
         if 'mean_pred' in validation_df.columns:
@@ -432,11 +427,8 @@ class EDA:
         if 'theta_pred' in validation_df.columns:
             plt.plot(val_dates, validation_df['theta_pred'], label='Theta Model Validation', color='green', linestyle=':', linewidth=2, alpha=0.7)
         
-        # Plot Weighted Validation Forecast
         if 'weighted_forecast' in validation_df.columns:
             plt.plot(val_dates, validation_df['weighted_forecast'], label='Weighted Validation Forecast', color='purple', linestyle='--', linewidth=2)
-            
-            # Plot GARCH Confidence Intervals for Validation
             if 'lower_ci' in validation_df.columns and 'upper_ci' in validation_df.columns:
                 plt.fill_between(val_dates, validation_df['lower_ci'], validation_df['upper_ci'], 
                                  color='purple', alpha=0.15, label='95% GARCH Validation CI')
@@ -457,16 +449,23 @@ class EDA:
         if 'weighted_forecast' in future_df.columns:
             plt.plot(fut_dates, future_df['weighted_forecast'], label='Combined Forecast', color='black', linewidth=2.5)
         
-        # 4. Plot GARCH Confidence Intervals (Future)
         if 'lower_ci' in future_df.columns and 'upper_ci' in future_df.columns:
             plt.fill_between(fut_dates, future_df['lower_ci'], future_df['upper_ci'], 
                              color='orange', alpha=0.3, label='95% GARCH Forecast CI')
         
-        # Add vertical lines for context
+        # Dynamic Y-axis Limiting
+        all_forecast_vals = pd.concat([
+            validation_df.select_dtypes(include=np.number),
+            future_df.select_dtypes(include=np.number)
+        ])
+        min_val = all_forecast_vals.min().min()
+        max_val = all_forecast_vals.max().max()
+        padding = (max_val - min_val) * 0.1
+        plt.ylim(min_val - padding, max_val + padding)
+
         last_hist_date = self.df.index[-1]
         plt.axvline(x=last_hist_date, color='green', linestyle='-', linewidth=1, label='Forecast Start')
         
-        # Approximate validation start
         if len(val_dates) > 0:
             val_start_date = val_dates.iloc[0] if hasattr(val_dates, 'iloc') else val_dates[0]
             plt.axvline(x=val_start_date, color='orange', linestyle='-', linewidth=1, label='Validation Start')
