@@ -25,28 +25,25 @@ class theta_model:
     design_theta_model()
         Fits the Theta model and returns a forecast DataFrame.
     """
-    def __init__(self, ts: pd.DataFrame, train_size: float, forecast_ahead: int, diagnostics: bool):
+    def __init__(self, ts: pd.DataFrame, forecast_ahead: int, diagnostics: bool):
         """
         Parameters
         ----------
         ts : pd.DataFrame
             Input DataFrame containing 'date' and 'typical_price' columns.
-        train_size : float
-            Proportion of data to use for training (0 to 1).
         forecast_ahead : int
             Number of periods to forecast into the future.
         diagnostics : bool
             If True, displays diagnostic plots during execution.
         """
         self.ts = ts
-        self.train_size = train_size
         self.forecast_ahead = forecast_ahead
         self.diagnostics = diagnostics
 
     def __str__(self):
         return f"Theta Model (Forecast: {self.forecast_ahead} steps)"
 
-    def _get_seasonal_period(self) -> int:
+    def _get_seasonal_period(self, data: pd.Series) -> int:
         """
         Detects the dominant seasonal period (m) using Autocorrelation Function (ACF).
 
@@ -57,7 +54,6 @@ class theta_model:
         """
         try:
             # Prepare data: use typical price
-            data = self.ts['typical_price'].values
             n = len(data)
             
             # Detrend the data (remove linear trend)
@@ -85,15 +81,20 @@ class theta_model:
             print(f"Seasonality detection failed: {e}. Defaulting to m=1.")
             return 1
 
-    def design_theta_model(self) -> pd.DataFrame:
+    def design_theta_model(self, validation_steps: int) -> pd.DataFrame:
         """
-        Fits the optimal Theta model for a given time-series.
+        Fits the optimal Theta model for a given time-series, generating both validation and future forecasts.
+
+        Parameters
+        ----------
+        validation_steps : int
+            Number of steps to use for validation at the end of the input time series.
 
         Returns
         -------
         pd.DataFrame
-            Standardized forecast DataFrame with columns:
-            ['date', 'prediction', 'model_name', 'variable', 'lower_bound', 'upper_bound']
+            A DataFrame containing both validation and future predictions with an additional 'type' column.
+            Columns: ['date', 'predicted_values', 'lower_bound', 'upper_bound', 'model_name', 'variable', 'type']
         """
         # Ensure date column is datetime and set as index for modeling/plotting
         ts_indexed = self.ts.copy()
@@ -101,73 +102,77 @@ class theta_model:
         ts_indexed.set_index('date', inplace=True)
         
         # Set a frequency to help statsmodels project correctly.
-        # We try to infer it, or set to 'W' (Weekly) since that's often the context here,
-        # but 'B' (Business Days) or 'D' (Daily) might also apply based on data.
         inferred_freq = pd.infer_freq(ts_indexed.index)
         if inferred_freq is None:
-            # Reindex with forward fill if necessary to establish a regular grid
-            # Or simpler: create a period index if dates are too messy for statsmodels
             ts_indexed = ts_indexed.asfreq('W-FRI', method='ffill')
 
-        split_idx = round(len(ts_indexed) * self.train_size)
-        # Split using the indexed series
-        train = ts_indexed.iloc[:split_idx]['typical_price']
-        test = ts_indexed.iloc[split_idx:]['typical_price']
+        # --- Validation Predictions ---
+        train_validation = ts_indexed.iloc[:-validation_steps]['typical_price']
+        test_validation = ts_indexed.iloc[-validation_steps:]['typical_price']
         
-        # Seasonal period detection via ACF
-        m = self._get_seasonal_period()
-        print(f"Detected seasonal period (m): {m}")
+        m_validation = self._get_seasonal_period(data=train_validation)
+        print(f"Detected seasonal period for validation (m): {m_validation}")
 
-        # Validation Model
-        val_model = ThetaModel(train, period=m)
+        val_model = ThetaModel(train_validation, period=m_validation)
         val_res = val_model.fit()
 
-        # Validation Predictions
-        fc = val_res.forecast(len(test))
-        conf_int = val_res.prediction_intervals(len(test))
-        test_df = pd.DataFrame({'pred': fc.values,
-                                'lower': conf_int.iloc[:, 0].values,
-                                'upper': conf_int.iloc[:, 1].values})
-        test_df.index = test.index
+        fc_val = val_res.forecast(len(test_validation))
+        conf_int_val = val_res.prediction_intervals(len(test_validation))
+        
+        validation_pred_df = pd.DataFrame({
+            'predicted_values': fc_val.values,
+            'lower_bound': conf_int_val.iloc[:, 0].values,
+            'upper_bound': conf_int_val.iloc[:, 1].values
+        })
+        validation_pred_df['date'] = test_validation.index
+        validation_pred_df['model_name'] = 'Theta'
+        validation_pred_df['variable'] = 'price'
+        validation_pred_df['type'] = 'validation'
 
-        # Retrain Best Model on Full Data for Future Forecast
-        best_model = ThetaModel(ts_indexed['typical_price'], period=m)
+        # --- Future Forecast ---
+        m_full = self._get_seasonal_period(data=ts_indexed['typical_price'])
+        print(f"Detected seasonal period for full model (m): {m_full}")
+
+        best_model = ThetaModel(ts_indexed['typical_price'], period=m_full)
         best_res = best_model.fit()
 
         forecast = best_res.forecast(self.forecast_ahead)
         conf_int_forecast = best_res.prediction_intervals(self.forecast_ahead)
         
-        pred_df = pd.DataFrame({
-            'prediction': forecast.values,
+        future_pred_df = pd.DataFrame({
+            'predicted_values': forecast.values,
             'lower_bound': conf_int_forecast.iloc[:, 0].values,
             'upper_bound': conf_int_forecast.iloc[:, 1].values
         })
         
-        # Manually create the future dates since Statsmodels might drop them
-        # if the frequency is complex
         future_dates = pd.date_range(start=ts_indexed.index[-1], periods=self.forecast_ahead + 1, freq=ts_indexed.index.freq)[1:]
-        pred_df['date'] = future_dates
+        future_pred_df['date'] = future_dates
         
-        pred_df['model_name'] = 'Theta'
-        pred_df['variable'] = 'price'
+        future_pred_df['model_name'] = 'Theta'
+        future_pred_df['variable'] = 'price'
+        future_pred_df['type'] = 'future'
         
-        # Reorder columns
-        pred_df = pred_df[['date', 'prediction', 'model_name', 'variable', 'lower_bound', 'upper_bound']]
+        # Combine and reorder
+        combined_df = pd.concat([validation_pred_df, future_pred_df], ignore_index=True)
+        combined_df = combined_df[['date', 'predicted_values', 'lower_bound', 'upper_bound', 'model_name', 'variable', 'type']]
 
         # Diagnostics Plotting
         if self.diagnostics:
             try:
+                # Create a test_df for plotting that matches the structure of validation_pred_df but with original column names
+                test_df_plot = validation_pred_df.rename(columns={'predicted_values': 'pred', 'lower_bound': 'lower', 'upper_bound': 'upper'})
+                
                 EDA.plot_mean_model_diagnostics(
-                    train=train,
-                    test=test,
-                    validation_df=test_df,
-                    forecast_df=pred_df,
-                    model=None # Passing None because ThetaModel is not fully compatible with SARIMAX diagnostics internals
+                    train=train_validation,
+                    test=test_validation,
+                    validation_df=test_df_plot,
+                    forecast_df=future_pred_df.rename(columns={'predicted_values': 'prediction'}),
+                    model=None
                 )
             except Exception as e:
-                print(f"Diagnostics plot encountered an error, potentially due to model format: {e}")
+                print(f"Diagnostics plot encountered an error: {e}")
 
-        return pred_df
+        return combined_df
 
 
 if __name__ == "__main__":
@@ -178,7 +183,16 @@ if __name__ == "__main__":
     raw['typical_price'] = np.round((raw['high'] + raw['low'] + raw['close']) / 3,2)
     ts = raw[['date', 'typical_price']].copy()
 
-    tm = theta_model(ts=ts, train_size=0.8, forecast_ahead=10, diagnostics=True)
+    tm = theta_model(ts=ts, forecast_ahead=10, diagnostics=True)
     print(tm)
-    pred_df = tm.design_theta_model()
-    print(pred_df)
+    
+    results_df = tm.design_theta_model(validation_steps=10)
+    print(results_df)
+
+    validation_results = results_df[results_df['type'] == 'validation']
+    future_forecast_results = results_df[results_df['type'] == 'future']
+
+    print("\nValidation Predictions:")
+    print(validation_results)
+    print("\nFuture Forecast:")
+    print(future_forecast_results)

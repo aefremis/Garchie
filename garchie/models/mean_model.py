@@ -28,14 +28,12 @@ class mean_model:
     design_mean_model()
         Fits the AutoRegressive model and returns a forecast DataFrame.
     """
-    def __init__(self, ts: pd.DataFrame, train_size: float, forecast_ahead: int, stationarity: bool, diagnostics: bool):
+    def __init__(self, ts: pd.DataFrame, forecast_ahead: int, stationarity: bool, diagnostics: bool):
         """
         Parameters
         ----------
         ts : pd.DataFrame
             Input DataFrame containing 'date' and 'typical_price' columns.
-        train_size : float
-            Proportion of data to use for training (0 to 1).
         forecast_ahead : int
             Number of periods to forecast into the future.
         stationarity : bool
@@ -44,7 +42,6 @@ class mean_model:
             If True, displays diagnostic plots during execution.
         """
         self.ts = ts
-        self.train_size = train_size
         self.forecast_ahead = forecast_ahead
         self.stationarity = stationarity
         self.diagnostics = diagnostics
@@ -52,9 +49,14 @@ class mean_model:
     def __str__(self):
         return f"ARIMA/SARIMA Mean Model (Forecast: {self.forecast_ahead} steps)"
 
-    def _get_seasonal_period(self) -> int:
+    def _get_seasonal_period(self, data: pd.Series) -> int:
         """
         Detects the dominant seasonal period (m) using Autocorrelation Function (ACF).
+
+        Parameters
+        ----------
+        data : pd.Series
+            The time series data to analyze for seasonality.
 
         Returns
         -------
@@ -62,8 +64,7 @@ class mean_model:
             Detected seasonal period. Defaults to 1 if no strong seasonality is found.
         """
         try:
-            # Prepare data: use typical price
-            data = self.ts['typical_price'].values
+            # Prepare data: use typical price (assuming data is already 'typical_price' series)
             n = len(data)
             
             # Detrend the data (remove linear trend)
@@ -91,15 +92,21 @@ class mean_model:
             print(f"Seasonality detection failed: {e}. Defaulting to m=1.")
             return 1
 
-    def design_mean_model(self) -> pd.DataFrame:
+    def design_mean_model(self, validation_steps: int) -> pd.DataFrame:
         """
-        Fits the optimal AutoRegressive model for a given time-series.
+        Fits the optimal AutoRegressive model for a given time-series, generating both
+        validation predictions and future forecasts.
+
+        Parameters
+        ----------
+        validation_steps : int
+            Number of steps to use for validation at the end of the input time series.
 
         Returns
         -------
         pd.DataFrame
-            Standardized forecast DataFrame with columns:
-            ['date', 'prediction', 'model_name', 'variable', 'lower_bound', 'upper_bound']
+            A DataFrame containing both validation and future predictions with an additional 'type' column.
+            Columns: ['date', 'predicted_values', 'lower_bound', 'upper_bound', 'model_name', 'variable', 'type']
         """
         # Ensure date column is datetime and set as index for modeling/plotting
         ts_indexed = self.ts.copy()
@@ -118,76 +125,113 @@ class mean_model:
                 dfoutput['Critical Value (%s)' % key] = value
             print(dfoutput)
 
-        
-        split_idx = round(len(ts_indexed)* self.train_size)
-        # Split using the indexed series
-        train = ts_indexed.iloc[:split_idx]['typical_price']
-        test = ts_indexed.iloc[split_idx:]['typical_price']
-        
-        # d term estimation
-        kpss_diffs = pmdarima.arima.ndiffs(train, alpha=0.05, test='kpss', max_d=6)
-        adf_diffs = pmdarima.arima.ndiffs(train, alpha=0.05, test='adf', max_d=6)
+        # Split data for validation
+        train_validation = ts_indexed.iloc[:-validation_steps]['typical_price']
+        test_validation = ts_indexed.iloc[-validation_steps:]['typical_price']
+
+        # d term estimation for validation model
+        kpss_diffs = pmdarima.arima.ndiffs(train_validation, alpha=0.05, test='kpss', max_d=6)
+        adf_diffs = pmdarima.arima.ndiffs(train_validation, alpha=0.05, test='adf', max_d=6)
         n_diffs = max(adf_diffs, kpss_diffs)
-        print(f"Estimated differencing term: {n_diffs}")
+        # print(f"Estimated differencing term for validation model: {n_diffs}")
 
-        # Seasonal period detection via ACF
-        m = self._get_seasonal_period()
-        print(f"Detected seasonal period (m): {m}")
+        # Seasonal period detection via ACF for validation model
+        m_validation = self._get_seasonal_period(data=train_validation) # Modified _get_seasonal_period to accept data
+        # print(f"Detected seasonal period (m) for validation model: {m_validation}")
 
-        # Auto-ARIMA
-        model = pmdarima.auto_arima(train,
+        # Auto-ARIMA for validation
+        validation_model = pmdarima.auto_arima(train_validation,
                                     d=n_diffs,
-                                    m=m,
-                                    seasonal=True if m > 1 else False,
+                                    m=m_validation,
+                                    seasonal=True if m_validation > 1 else False,
                                     start_p=1, start_q=1,
                                     max_p=5, max_q=5,
                                     trace=False,
-                                    error_action='ignore',  
+                                    error_action='ignore',
                                     suppress_warnings=True,
                                     stepwise=True)
 
         # Validation Predictions
-        fc, conf_int = model.predict(n_periods=len(test), return_conf_int=True)
-        test_df = pd.DataFrame({'pred': fc,
-                                'lower': conf_int[:, 0],
-                                'upper': conf_int[:, 1]})
-        test_df.set_index(test.index, inplace=True)
+        fc_val, conf_int_val = validation_model.predict(n_periods=len(test_validation), return_conf_int=True)
+        validation_pred_df = pd.DataFrame({'predicted_values': fc_val, # Renamed column
+                                'lower_bound': conf_int_val[:, 0],
+                                'upper_bound': conf_int_val[:, 1]})
+        validation_pred_df.set_index(test_validation.index, inplace=True)
+
+        validation_pred_df.reset_index(inplace=True)
+        validation_pred_df.rename(columns={'index': 'date'}, inplace=True) # Ensure 'date' column name
+        validation_pred_df['model_name'] = 'ARIMA'
+        validation_pred_df['variable'] = 'price'
+        validation_pred_df['type'] = 'validation' # Added type column
+        validation_pred_df = validation_pred_df[['date', 'predicted_values', 'lower_bound', 'upper_bound', 'model_name', 'variable', 'type']]
+
 
         # Retrain Best Model on Full Data for Future Forecast
-        # Using SARIMAX with order found by auto_arima
+        # d term estimation for full model
+        kpss_diffs_full = pmdarima.arima.ndiffs(ts_indexed['typical_price'], alpha=0.05, test='kpss', max_d=6)
+        adf_diffs_full = pmdarima.arima.ndiffs(ts_indexed['typical_price'], alpha=0.05, test='adf', max_d=6)
+        n_diffs_full = max(adf_diffs_full, kpss_diffs_full)
+        # print(f"Estimated differencing term for full model: {n_diffs_full}")
+
+        # Seasonal period detection via ACF for full model
+        m_full = self._get_seasonal_period(data=ts_indexed['typical_price']) # Modified _get_seasonal_period to accept data
+        # print(f"Detected seasonal period (m) for full model: {m_full}")
+
+        full_model = pmdarima.auto_arima(ts_indexed['typical_price'],
+                                    d=n_diffs_full,
+                                    m=m_full,
+                                    seasonal=True if m_full > 1 else False,
+                                    start_p=1, start_q=1,
+                                    max_p=5, max_q=5,
+                                    trace=False,
+                                    error_action='ignore',
+                                    suppress_warnings=True,
+                                    stepwise=True)
+
+
         # We pass the full series with DatetimeIndex
-        best_model = SARIMAX(ts_indexed['typical_price'],
-                            order=model.order,
-                            seasonal_order=model.seasonal_order).fit(disp=False)
+        best_model_full_data = SARIMAX(ts_indexed['typical_price'],
+                            order=full_model.order,
+                            seasonal_order=full_model.seasonal_order).fit(disp=False)
 
-        forecast = best_model.get_forecast(steps=self.forecast_ahead)
-        pred_df = forecast.conf_int()
-        pred_df['prediction'] = forecast.predicted_mean
-        pred_df.columns = ['lower_bound', 'upper_bound', 'prediction']
-        
-        
-        pred_df.reset_index(inplace=True)
-        # Rename column to 'date' if it was named 'index'
-        if 'index' in pred_df.columns:
-            pred_df.rename(columns={'index': 'date'}, inplace=True)
-        
-        pred_df['model_name'] = 'ARIMA'
-        pred_df['variable'] = 'price'
-        
+        forecast_full = best_model_full_data.get_forecast(steps=self.forecast_ahead)
+        future_pred_df = forecast_full.conf_int()
+        future_pred_df['predicted_values'] = forecast_full.predicted_mean # Renamed column
+        future_pred_df.columns = ['lower_bound', 'upper_bound', 'predicted_values']
+
+        # Generate future dates explicitly
+        last_date = ts_indexed.index[-1]
+        freq = pd.infer_freq(ts_indexed.index)
+        if freq is None:
+            # Fallback heuristic if frequency cannot be inferred
+            if len(ts_indexed.index) > 1:
+                diff = ts_indexed.index[-1] - ts_indexed.index[-2]
+                if diff.days <= 2: freq = 'D' # daily or business day
+                elif diff.days <= 7: freq = 'W' # weekly
+                else: freq = 'D' # Default to daily if no clear pattern
+            else:
+                freq = 'D' # Default for single point
+
+        future_dates = pd.date_range(start=last_date, periods=self.forecast_ahead + 1, freq=freq)[1:]
+        future_pred_df['date'] = future_dates.to_numpy()
+        future_pred_df['model_name'] = 'ARIMA'
+        future_pred_df['variable'] = 'price'
+        future_pred_df['type'] = 'future' # Added type column
+
         # Reorder columns
-        pred_df = pred_df[['date', 'prediction', 'model_name', 'variable', 'lower_bound', 'upper_bound']]
+        future_pred_df = future_pred_df[['date', 'predicted_values', 'lower_bound', 'upper_bound', 'model_name', 'variable', 'type']]
 
-        # Diagnostics Plotting
+        # Diagnostics Plotting (can be adapted to show both or split)
         if self.diagnostics:
             EDA.plot_mean_model_diagnostics(
-                train=train,
-                test=test,
-                validation_df=test_df,
-                forecast_df=pred_df,
-                model=best_model # Passing the auto_arima model for diagnostics
+                train=train_validation,
+                test=test_validation,
+                validation_df=validation_pred_df.rename(columns={'predicted_values': 'prediction'}), # Pass original names for plotting
+                forecast_df=future_pred_df.rename(columns={'predicted_values': 'prediction'}),      # Pass original names for plotting
+                model=best_model_full_data
             )
 
-        return pred_df
+        return pd.concat([validation_pred_df, future_pred_df], ignore_index=True) # Return combined DataFrame
 
 if __name__ == "__main__":
     # select asset
@@ -197,7 +241,16 @@ if __name__ == "__main__":
     raw['typical_price'] = np.round((raw['high'] + raw['low'] + raw['close']) / 3,2)
     ts = raw[['date', 'typical_price']].copy()
 
-    mm = mean_model(ts=ts, train_size=0.8, forecast_ahead=10, stationarity=True, diagnostics=True)
+    mm = mean_model(ts=ts, forecast_ahead=10, stationarity=True, diagnostics=True)
     print(mm)
-    pred_df = mm.design_mean_model()
-    print(pred_df)
+    # Changed call to design_mean_model
+    results_df = mm.design_mean_model(validation_steps=10)
+    print(results_df)
+
+    validation_results = results_df[results_df['type'] == 'validation']
+    future_forecast_results = results_df[results_df['type'] == 'future']
+
+    print("\nValidation Predictions:")
+    print(validation_results)
+    print("\nFuture Forecast:")
+    print(future_forecast_results)

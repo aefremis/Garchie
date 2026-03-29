@@ -68,47 +68,90 @@ class gam_model:
             )
         return freq_map[self.forecast_unit]
     
-    def design_gam_model(self) -> pd.DataFrame:
+    def design_gam_model(self, validation_steps: int) -> pd.DataFrame:
         """
-        Fits the GAM model using Prophet and generates forecasts.
+        Fits the GAM model using Prophet and generates both validation and future forecasts.
+
+        Parameters
+        ----------
+        validation_steps : int
+            Number of steps to use for validation at the end of the input time series.
 
         Returns
         -------
         pd.DataFrame
-            Standardized forecast DataFrame with columns:
-            ['date', 'prediction', 'model_name', 'variable', 'lower_bound', 'upper_bound']
+            A DataFrame containing both validation and future predictions with an additional 'type' column.
+            Columns: ['date', 'predicted_values', 'lower_bound', 'upper_bound', 'model_name', 'variable', 'type']
         """
+        # --- Validation Predictions ---
+        # Split data for validation
+        ts_indexed = self.ts.copy()
+        ts_indexed['date'] = pd.to_datetime(ts_indexed['date']) # Ensure date is datetime
+        
+        train_validation_df = ts_indexed.iloc[:-validation_steps].rename(columns={'date': 'ds', 'typical_price': 'y'})
+        test_validation_dates = ts_indexed.iloc[-validation_steps:]['date']
 
-         # make prophet dataset
-        gam_df = self.ts.rename(columns={'date':'ds','typical_price':'y'})
-        model = ph.Prophet()
-        model.fit(gam_df)
+        # Fit model on training data for validation
+        model_validation = ph.Prophet()
+        model_validation.fit(train_validation_df)
 
         freq = self._get_freq()
 
-        future = model.make_future_dataframe(periods = self.forecast_ahead, freq=freq)
-        forecast = model.predict(future)
+        # Generate future dataframe for validation period
+        future_validation = model_validation.make_future_dataframe(periods=validation_steps, freq=freq, include_history=False)
         
-        # Standardize return structure
-        pred_df = forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(self.forecast_ahead).copy()
-        pred_df.rename(columns={
+        # Predict validation period
+        forecast_validation = model_validation.predict(future_validation)
+        
+        # Standardize validation return structure
+        validation_pred_df = forecast_validation[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].copy()
+        validation_pred_df.rename(columns={
             'ds': 'date',
-            'yhat': 'prediction',
+            'yhat': 'predicted_values',
             'yhat_lower': 'lower_bound',
             'yhat_upper': 'upper_bound'
         }, inplace=True)
         
-        pred_df['model_name'] = 'GAM'
-        pred_df['variable'] = 'price'
+        validation_pred_df['model_name'] = 'GAM'
+        validation_pred_df['variable'] = 'price'
+        validation_pred_df['type'] = 'validation'
         
         # Reorder columns
-        pred_df = pred_df[['date', 'prediction', 'model_name', 'variable', 'lower_bound', 'upper_bound']]
-        
-        # diagnostics
-        if self.diagnostics:
-            EDA.plot_gam_diagnostics(model, forecast)
+        validation_pred_df = validation_pred_df[['date', 'predicted_values', 'lower_bound', 'upper_bound', 'model_name', 'variable', 'type']]
 
-        return pred_df
+        # --- Future Forecast Predictions ---
+        # Make prophet dataset from full data
+        gam_df_full = self.ts.rename(columns={'date':'ds','typical_price':'y'})
+        model_full = ph.Prophet()
+        model_full.fit(gam_df_full)
+
+        # Generate future dataframe for actual forecast_ahead
+        future_forecast = model_full.make_future_dataframe(periods=self.forecast_ahead, freq=freq, include_history=False)
+        
+        # Predict future period
+        forecast_full = model_full.predict(future_forecast)
+        
+        # Standardize future forecast return structure
+        future_pred_df = forecast_full[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].copy()
+        future_pred_df.rename(columns={
+            'ds': 'date',
+            'yhat': 'predicted_values',
+            'yhat_lower': 'lower_bound',
+            'yhat_upper': 'upper_bound'
+        }, inplace=True)
+        
+        future_pred_df['model_name'] = 'GAM'
+        future_pred_df['variable'] = 'price'
+        future_pred_df['type'] = 'future'
+        
+        # Reorder columns
+        future_pred_df = future_pred_df[['date', 'predicted_values', 'lower_bound', 'upper_bound', 'model_name', 'variable', 'type']]
+        
+        # diagnostics for full model (optional, can be adapted)
+        if self.diagnostics:
+            EDA.plot_gam_diagnostics(model_full, forecast_full)
+
+        return pd.concat([validation_pred_df, future_pred_df], ignore_index=True)
     
 
 if __name__ == "__main__":
@@ -121,5 +164,14 @@ if __name__ == "__main__":
 
     gm = gam_model(ts=ts, forecast_ahead=25, forecast_unit='weeks', diagnostics=True)
     print(gm)
-    forecast_results = gm.design_gam_model()
-    print(forecast_results)
+    
+    results_df = gm.design_gam_model(validation_steps=10) # Added validation_steps
+    print(results_df)
+
+    validation_results = results_df[results_df['type'] == 'validation']
+    future_forecast_results = results_df[results_df['type'] == 'future']
+
+    print("\nValidation Predictions:")
+    print(validation_results)
+    print("\nFuture Forecast:")
+    print(future_forecast_results)
