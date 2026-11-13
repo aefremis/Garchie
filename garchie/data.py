@@ -17,19 +17,19 @@ class crypto:
         A string that denotes the end date in the format (yyyy-mm-dd).
     """
 
-    def __init__(self, symbol, market, granularity, start, end):
+    def __init__(self, symbol, market='USD', granularity='1d', start=None, end=None):
         """
         Parameters
        ----------
         symbol : str
             A string that corresponds to the asset's symbol.
-        market : str
-            The physical currency of the digital currency price, e.g., 'USD'.
-        granularity : str
+        market : str, optional
+            The physical currency of the digital currency price, e.g., 'USD' (default is 'USD').
+        granularity : str, optional
             A string that points to the time aggregation. Supported intervals are ["1d", "1wk", "1mo"].
-        start : str
+        start : str, optional
             A string that denotes the start date in the format (yyyy-mm-dd).
-        end : str
+        end : str, optional
             A string that denotes the end date in the format (yyyy-mm-dd).
         """
         self.symbol = symbol
@@ -64,7 +64,7 @@ class crypto:
 
         # --- ACTION REQUIRED ---
         # Replace "YOUR_API_KEY" with the key you obtained from Alpha Vantage
-        api_key = "YOUR_API_KEY"
+        api_key = "OVAYAKMDMRYMDVUU"
 
         cc = CryptoCurrencies(key=api_key, output_format='pandas')
 
@@ -85,16 +85,19 @@ class crypto:
 
         # Filter data based on start and end dates
         raw.index = pd.to_datetime(raw.index)
-        raw = raw[(raw.index >= self.start) & (raw.index <= self.end)]
+        if self.start:
+            raw = raw[raw.index >= self.start]
+        if self.end:
+            raw = raw[raw.index <= self.end]
 
         if raw.empty:
             print(f"Warning: No crypto data found for {self.symbol} in the specified date range.")
             return raw
 
         # Standardize column names
-        raw.columns = [col.split(' ')[-1] for col in raw.columns]
+        raw.columns = [col.split(' ')[-1].lower() for col in raw.columns]
         
-        # pct_change() expects specific column names, so we need to rename them
+        # Rename legacy market-suffixed column names if present
         raw.rename(columns={
             f'open({self.market.lower()})': 'open',
             f'high({self.market.lower()})': 'high',
@@ -102,15 +105,19 @@ class crypto:
             f'close({self.market.lower()})': 'close',
             'volume': 'volume'
         }, inplace=True)
+
+        for col in ['open', 'high', 'low', 'close', 'volume']:
+            if col in raw.columns:
+                raw[col] = pd.to_numeric(raw[col], errors='coerce')
         
         raw.sort_index(inplace=True)
         raw['return'] = 100 * (raw['close'].pct_change())
         raw.dropna(axis=0, inplace=True)
 
         raw.reset_index(inplace=True)
-        raw.rename(columns={'index':'date'}, inplace=True)
+        raw.rename(columns={'index': 'date'}, inplace=True)
 
-        return (df)
+        return raw
 
 
 '''
