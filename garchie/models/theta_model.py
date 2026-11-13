@@ -105,6 +105,8 @@ class theta_model:
         inferred_freq = pd.infer_freq(ts_indexed.index)
         if inferred_freq is None:
             ts_indexed = ts_indexed.asfreq('W-FRI', method='ffill')
+        else:
+            ts_indexed.index.freq = pd.tseries.frequencies.to_offset(inferred_freq)
 
         # --- Validation Predictions ---
         train_validation = ts_indexed.iloc[:-validation_steps]['typical_price']
@@ -160,7 +162,9 @@ class theta_model:
         if self.diagnostics:
             try:
                 # Create a test_df for plotting that matches the structure of validation_pred_df but with original column names
-                test_df_plot = validation_pred_df.rename(columns={'predicted_values': 'pred', 'lower_bound': 'lower', 'upper_bound': 'upper'})
+                test_df_plot = validation_pred_df.set_index('date').rename(
+                    columns={'predicted_values': 'pred', 'lower_bound': 'lower', 'upper_bound': 'upper'}
+                )
                 
                 EDA.plot_mean_model_diagnostics(
                     train=train_validation,

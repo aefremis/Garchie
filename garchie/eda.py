@@ -100,12 +100,20 @@ class EDA:
             fig, ax = plt.subplots(figsize=(12, 7))
             ax.plot(train, label='Train', marker='.')
             ax.plot(test, label='Test', marker='.')
+
+            if 'date' in validation_df.columns:
+                val_x = pd.to_datetime(validation_df['date'])
+            else:
+                val_x = pd.to_datetime(validation_df.index)
             
-            if 'pred' in validation_df.columns:
-                ax.plot(validation_df.index, validation_df['pred'], label='Validation Prediction', ls='--', linewidth=2, color='green')
+            pred_col = 'pred' if 'pred' in validation_df.columns else ('prediction' if 'prediction' in validation_df.columns else None)
+            if pred_col is not None:
+                ax.plot(val_x, validation_df[pred_col], label='Validation Prediction', ls='--', linewidth=2, color='green')
             
-            if 'lower' in validation_df.columns and 'upper' in validation_df.columns:
-                ax.fill_between(validation_df.index, validation_df['lower'], validation_df['upper'], color='green', alpha=0.15, label='95% CI')
+            lower_col = 'lower' if 'lower' in validation_df.columns else ('lower_bound' if 'lower_bound' in validation_df.columns else None)
+            upper_col = 'upper' if 'upper' in validation_df.columns else ('upper_bound' if 'upper_bound' in validation_df.columns else None)
+            if lower_col is not None and upper_col is not None:
+                ax.fill_between(val_x, validation_df[lower_col], validation_df[upper_col], color='green', alpha=0.15, label='95% CI')
 
             ax.set_title('Model Validation (Backtest)', fontsize=16)
             ax.legend(loc='upper left')
