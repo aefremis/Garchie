@@ -60,7 +60,7 @@ class gam_model:
         freq_map = {
             "days": "D",
             "weeks": "W",
-            "months": "MS"  
+            "months": "MS"  # Month-start aligns forecasts to the 1st of each month
         }
         if self.forecast_unit not in freq_map:
             raise ValueError(
@@ -88,6 +88,7 @@ class gam_model:
         ts_indexed = self.ts.copy()
         ts_indexed['date'] = pd.to_datetime(ts_indexed['date']) # Ensure date is datetime
         
+        # Prophet requires columns named 'ds' (date) and 'y' (target)
         train_validation_df = ts_indexed.iloc[:-validation_steps].rename(columns={'date': 'ds', 'typical_price': 'y'})
         test_validation_dates = ts_indexed.iloc[-validation_steps:]['date']
 
@@ -97,7 +98,7 @@ class gam_model:
 
         freq = self._get_freq()
 
-        # Generate future dataframe for validation period
+        # Generate future dataframe for validation period (out-of-sample only)
         future_validation = model_validation.make_future_dataframe(periods=validation_steps, freq=freq, include_history=False)
         
         # Predict validation period
@@ -120,7 +121,7 @@ class gam_model:
         validation_pred_df = validation_pred_df[['date', 'predicted_values', 'lower_bound', 'upper_bound', 'model_name', 'variable', 'type']]
 
         # --- Future Forecast Predictions ---
-        # Make prophet dataset from full data
+        # Refit on the full history before generating out-of-sample forecasts
         gam_df_full = self.ts.rename(columns={'date':'ds','typical_price':'y'})
         model_full = ph.Prophet()
         model_full.fit(gam_df_full)

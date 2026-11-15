@@ -67,12 +67,12 @@ class mean_model:
             # Prepare data: use typical price (assuming data is already 'typical_price' series)
             n = len(data)
             
-            # Detrend the data (remove linear trend)
+            # Detrend the data so a strong linear trend doesn't mask seasonal ACF peaks
             x = np.arange(n)
             p = np.polyfit(x, data, 1)
             detrended = data - np.polyval(p, x)
             
-            # Compute ACF
+            # Compute ACF up to half the series length for reliable lag estimates
             acf_vals = acf(detrended, nlags=n//2, fft=True)
             
             # Find the peak in ACF (ignoring very short-term correlations at lags < 5)
@@ -129,7 +129,7 @@ class mean_model:
         train_validation = ts_indexed.iloc[:-validation_steps]['typical_price']
         test_validation = ts_indexed.iloc[-validation_steps:]['typical_price']
 
-        # d term estimation for validation model
+        # d term estimation for validation model (max of KPSS and ADF ensures stationarity under both tests)
         kpss_diffs = pmdarima.arima.ndiffs(train_validation, alpha=0.05, test='kpss', max_d=6)
         adf_diffs = pmdarima.arima.ndiffs(train_validation, alpha=0.05, test='adf', max_d=6)
         n_diffs = max(adf_diffs, kpss_diffs)
@@ -189,6 +189,7 @@ class mean_model:
                                     stepwise=True)
 
 
+        # Refit selected orders with statsmodels SARIMAX to expose get_forecast() and diagnostic plots
         # We pass the full series with DatetimeIndex
         best_model_full_data = SARIMAX(ts_indexed['typical_price'],
                             order=full_model.order,
@@ -212,6 +213,7 @@ class mean_model:
             else:
                 freq = 'D' # Default for single point
 
+        # [1:] skips last_date so dates begin at the first future step
         future_dates = pd.date_range(start=last_date, periods=self.forecast_ahead + 1, freq=freq)[1:]
         future_pred_df['date'] = future_dates.to_numpy()
         future_pred_df['model_name'] = 'ARIMA'

@@ -154,6 +154,7 @@ class garch_model:
         """
         best_vol = best_model.model.volatility.name
         if best_vol == 'EGARCH':
+            # EGARCH lacks a closed-form multi-step analytic forecast; use bootstrap or simulation
             try:
                 forecast = best_model.forecast(horizon=forecast_horizon, method="bootstrap").variance.T
             except ValueError:
@@ -168,14 +169,17 @@ class garch_model:
         last_date = ts.index[-1]
         freq = self._get_freq()
 
+        # [1:] skips last_date so the range starts at the first future step
         future_dates = pd.date_range(start=last_date, periods=forecast_horizon + 1, freq=freq)[1:]
         pred_df['date'] = future_dates
         
+        # Convert conditional variance forecasts to volatility (standard deviation)
         volatility = np.sqrt(forecast.values.flatten())
         
         pred_df['predicted_values'] = volatility
         pred_df['model_name'] = 'GARCH'
         pred_df['variable'] = 'volatility'
+        # Bounds omitted to keep a consistent schema with mean/price models
         pred_df['lower_bound'] = np.nan
         pred_df['upper_bound'] = np.nan
         
@@ -199,7 +203,7 @@ class garch_model:
         # --- Validation Forecast ---
         train_validation = self.ts.iloc[:-validation_steps]
         
-        # Grid search for validation model
+        # Grid search for validation model (o=1 adds asymmetric leverage terms)
         p_values = range(1, 2)
         q_values = [1]
         o_values = range(2)
@@ -224,8 +228,10 @@ class garch_model:
                 temp_df = pd.DataFrame.from_dict([{'aic': candidate['aic'], 'sbc': candidate['bic'], 'loglikelihood': candidate['loglikelihood']}])
                 results_df_val = pd.concat([results_df_val, temp_df])
             except:
+                # Skip parameter combinations that fail to converge or are invalid
                 continue
 
+        # Select model with the lowest average rank (lower AIC/SBC is better; higher log-likelihood is better)
         results_df_val['rank_aic'] = results_df_val['aic'].rank()
         results_df_val['rank_sbc'] = results_df_val['sbc'].rank()
         results_df_val['rank_loglik'] = results_df_val['loglikelihood'].rank(ascending=False)
@@ -240,6 +246,7 @@ class garch_model:
         validation_pred_df['type'] = 'validation'
 
         # --- Future Forecast ---
+        # Re-run grid search on the full series to select the final forecast specification
         results_df_future = pd.DataFrame()
         for i in range(parameter_grid_df.shape[0]):
             try:
@@ -251,6 +258,7 @@ class garch_model:
             except:
                 continue
 
+        # Rank candidates by combined AIC, SBC, and log-likelihood as in validation
         results_df_future['rank_aic'] = results_df_future['aic'].rank()
         results_df_future['rank_sbc'] = results_df_future['sbc'].rank()
         results_df_future['rank_loglik'] = results_df_future['loglikelihood'].rank(ascending=False)

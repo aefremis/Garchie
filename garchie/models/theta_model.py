@@ -56,12 +56,12 @@ class theta_model:
             # Prepare data: use typical price
             n = len(data)
             
-            # Detrend the data (remove linear trend)
+            # Detrend the data so a strong linear trend doesn't mask seasonal ACF peaks
             x = np.arange(n)
             p = np.polyfit(x, data, 1)
             detrended = data - np.polyval(p, x)
             
-            # Compute ACF
+            # Compute ACF up to half the series length for reliable lag estimates
             acf_vals = acf(detrended, nlags=n//2, fft=True)
             
             # Find the peak in ACF (ignoring very short-term correlations at lags < 5)
@@ -101,7 +101,7 @@ class theta_model:
         ts_indexed['date'] = pd.to_datetime(ts_indexed['date'])
         ts_indexed.set_index('date', inplace=True)
         
-        # Set a frequency to help statsmodels project correctly.
+        # Set a frequency to help statsmodels project correctly (fall back to weekly Friday if irregular)
         inferred_freq = pd.infer_freq(ts_indexed.index)
         if inferred_freq is None:
             ts_indexed = ts_indexed.asfreq('W-FRI', method='ffill')
@@ -147,6 +147,7 @@ class theta_model:
             'upper_bound': conf_int_forecast.iloc[:, 1].values
         })
         
+        # [1:] skips the last observed timestamp so the range starts one step ahead
         future_dates = pd.date_range(start=ts_indexed.index[-1], periods=self.forecast_ahead + 1, freq=ts_indexed.index.freq)[1:]
         future_pred_df['date'] = future_dates
         
@@ -161,7 +162,7 @@ class theta_model:
         # Diagnostics Plotting
         if self.diagnostics:
             try:
-                # Create a test_df for plotting that matches the structure of validation_pred_df but with original column names
+                # Map columns to the format expected by EDA.plot_mean_model_diagnostics (no SARIMAX model object)
                 test_df_plot = validation_pred_df.set_index('date').rename(
                     columns={'predicted_values': 'pred', 'lower_bound': 'lower', 'upper_bound': 'upper'}
                 )
